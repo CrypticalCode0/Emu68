@@ -355,26 +355,34 @@ uint32_t *EMIT_line8(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed
 /*
     static EMIT_Function JumpTable[4096] = {
         [00000 ... 00007] = EMIT_OR,    //D0 Destination
-        [00020 ... 00074] = EMIT_OR,
+        [00020 ... 00047] = EMIT_OR,	//indirect
+        [00050 ... 00074] = EMIT_OR,	//Extension word required, (An,d16) or extended format.
         [00100 ... 00107] = EMIT_OR,
-        [00120 ... 00174] = EMIT_OR,
+        [00120 ... 00147] = EMIT_OR,
+        [00150 ... 00174] = EMIT_OR,
         [00200 ... 00207] = EMIT_OR,
-        [00220 ... 00274] = EMIT_OR,
+        [00220 ... 00247] = EMIT_OR,
+        [00250 ... 00274] = EMIT_OR,
         
         [00300 ... 00307] = EMIT_DIVU,  //D0 Destination, DIVU.W
-        [00320 ... 00374] = EMIT_DIVU,
+        [00320 ... 00347] = EMIT_DIVU,
+        [00350 ... 00374] = EMIT_DIVU,
         
         [00400 ... 00417] = EMIT_SBCD,  //R0 Destination
-        [00420 ... 00474] = EMIT_OR,    //D0 Source
+        [00420 ... 00447] = EMIT_OR,
+        [00450 ... 00474] = EMIT_OR,    //D0 Source
         
         [00500 ... 00517] = EMIT_PACK,  //R0 Destination, 020 and UP only, fetches another Word.(16-bit adjustment)
-        [00520 ... 00574] = EMIT_OR,
+        [00520 ... 00547] = EMIT_OR,
+        [00550 ... 00574] = EMIT_OR,
         
         [00600 ... 00617] = EMIT_UNPK,  //R0 Destination, 020 and UP only, fetches another Word.(16-bit adjustment)
-        [00620 ... 00674] = EMIT_OR,
+        [00620 ... 00647] = EMIT_OR,
+        [00650 ... 00674] = EMIT_OR,
         
         [00700 ... 00707] = EMIT_DIVS,  //D0 Destination, DIVS.W
-        [00720 ... 00774] = EMIT_DIVS,
+        [00720 ... 00747] = EMIT_DIVS,
+		[00750 ... 00774] = EMIT_DIVS,
         
         [01000 ... 01007] = EMIT_OR,    //D1 Destination
         [01020 ... 01074] = EMIT_OR,
