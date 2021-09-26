@@ -39,7 +39,7 @@ struct M68KTranslationUnit {
     uint64_t        mt_FetchCount;
     void *          mt_ARMEntryPoint;
     struct M68KLocalState *  mt_LocalState;
-    struct MD5      mt_MD5;
+    uint32_t        mt_CRC32;
     uint32_t        mt_ARMCode[]
 #ifdef __aarch64__
     __attribute__((aligned(64)));
@@ -83,9 +83,76 @@ struct M68KState
     uint32_t FPIAR;
     uint16_t FPCR;
     union {
-        double d;
-        uint64_t u64;
-        uint32_t u32[2];
+		uint8_t B;
+		uint16_t W;
+		uint32_t L;
+		double d;
+		uint64_t u64;
+		uint32_t u32[2];
+		union realS { //WARNING!! ASUMPTION on float structure, might be reversedmust check MSB and LSB compiler since both ARM and M68K are BE
+			struct { 
+				uint32_t sign:1;
+				uint32_t exponent:8;
+				uint32_t fraction:23;			
+			};
+			uint32_t single;
+			float S;
+		};
+		union realD {
+			struct {
+				uint64_t sign:1;
+				uint64_t exponent:11;
+				uint64_t fraction:52;
+			};
+			uint64_t _double;
+			double D;
+		};
+		union realX {
+			struct {
+				uint16_t sign:1;
+				uint16_t exponent:15;
+				const uint16_t zero = 0;
+				uint64_t integerpart:1 = 1;
+				uint64_t mantissa:63;
+			};
+			long double X;
+			uint32_t longs[3];
+			uint16_t words[6];
+			uint8_t bytes[16];
+		};
+		union realP {
+			struct [
+				uint32_t sm:1;
+				uint32_t se:1;
+				uint32_t yy:2;
+				uint32_t exp0:4;
+				uint32_t exp1:4;
+				uint32_t exp2:4;
+				uint32_t exp3:4;
+				uint32_t zero:8 = 0;
+				uint32_t digit16:4;
+				uint32_t digit15:4;
+				uint32_t digit14:4;
+				uint32_t digit13:4;
+				uint32_t digit12:4;
+				uint32_t digit11:4;
+				uint32_t digit10:4;
+				uint32_t digit9:4;
+				uint32_t digit8:4;
+				uint32_t digit7:4;
+				uint32_t digit6:4;
+				uint32_t digit5:4;
+				uint32_t digit4:4;
+				uint32_t digit3:4;
+				uint32_t digit2:4;
+				uint32_t digit1:4;
+				uint32_t digit0:4;
+			};
+			long double P; //this is not wise to use.
+			uint32_t longs[3];
+			uint16_t words[6];
+			uint8_t bytes[16];
+		};
     } FP[8];   // Double precision! Extended is "emulated" in load/store only
 
     /* Async IRQ part */
@@ -101,9 +168,35 @@ struct M68KState
 
 #define SR_C    0x0001
 #define SR_V    0x0002
+#define SR_VC   0x0003
 #define SR_Z    0x0004
+#define SR_ZC   0x0005
+#define SR_ZV   0x0006
+#define SR_ZVC  0x0007
 #define SR_N    0x0008
+#define SR_NC   0x0009
+#define SR_NV   0x000a
+#define SR_NVC  0x000b
+#define SR_NZ   0x000c
+#define SR_NZC  0x000d
+#define SR_NZV  0x000e
+#define SR_NZVC 0x000f
 #define SR_X    0x0010
+#define SR_XC   0x0011
+#define SR_XV   0x0012
+#define SR_XVC  0x0013
+#define SR_XZ   0x0014
+#define SR_XZC  0x0015
+#define SR_XZV  0x0016
+#define SR_XZVC 0x0017
+#define SR_XN   0x0018
+#define SR_XNC  0x0019
+#define SR_XNV  0x001a
+#define SR_XNVC 0x001b
+#define SR_XNZ  0x001c
+#define SR_XNZC 0x001d
+#define SR_XNZV 0x001e
+#define SR_CCR  0x001f
 #define SR_IPL  0x0700
 #define SR_M    0x1000
 #define SR_S    0x2000
@@ -121,10 +214,24 @@ struct M68KState
 #define SRB_T0   14
 #define SRB_T1   15
 
+#define FPSR_INEX	0x00000008
+#define FPSR_IOP	0x00000080
+#define FPSR_INEX1	0x00000100
+#define FPSR_INEX2	0x00000200
+#define FPSR_DZ		0x00000410	//these also appear in AEXC
+#define FPSR_UNFL	0x00000820	//these also appear in AEXC
+#define FPSR_OVFL	0x00001040	//these also appear in AEXC
+#define FPSR_OPERR	0x00002000
+#define FPSR_SNAN	0x00004000
+#define FPSR_BSUN	0x00008000
+#define FPSR_Q		0x007F0000
+#define FPSR_S		0x00800000
 #define FPSR_N      0x08000000
 #define FPSR_Z      0x04000000
 #define FPSR_I      0x02000000
 #define FPSR_NAN    0x01000000
+
+#define	FPSRB_S		23
 #define FPSRB_N     27
 #define FPSRB_Z     26
 #define FPSRB_I     25
@@ -228,6 +335,7 @@ uint32_t *EMIT_lineF(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed
 uint32_t *EMIT_move(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed);
 
 typedef uint32_t * (*EMIT_Function)(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr);
+typedef uint32_t * (*EMIT_MultiFunction)(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_t *insn_consumed);
 
 uint32_t *EMIT_InjectPrintContext(uint32_t *ptr);
 uint32_t *EMIT_InjectDebugStringV(uint32_t *ptr, const char * restrict format, va_list args);

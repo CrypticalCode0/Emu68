@@ -30,8 +30,8 @@ options_t Options = {
 };
 #endif
 
-const int disasm = 0;
-const int debug = 0;
+int disasm = 0;
+int debug = 0;
 const int debug_cnt = 0;
 
 struct List *ICache;
@@ -47,7 +47,7 @@ uint32_t *EMIT_GetOffsetPC(uint32_t *ptr, int8_t *offset)
     int new_offset = _pc_rel + *offset;
 
     // If overflow would occur then compute PC and get new offset
-    while (new_offset > 127 || new_offset < -127)
+    if (new_offset > 127 || new_offset < -127)
     {
         if (_pc_rel > 0)
             *ptr++ = add_immed(REG_PC, REG_PC, _pc_rel);
@@ -55,6 +55,7 @@ uint32_t *EMIT_GetOffsetPC(uint32_t *ptr, int8_t *offset)
             *ptr++ = sub_immed(REG_PC, REG_PC, -_pc_rel);
 
         _pc_rel = 0;
+        new_offset = *offset;
     }
 
     *offset = new_offset;
@@ -191,8 +192,8 @@ uint16_t *M68K_PopReturnAddress(uint8_t *success)
 {
     uint16_t *ptr;
 
-    if (ReturnStackDepth > 0) {
-
+    if (EMU68_USE_RETURN_STACK && ReturnStackDepth > 0)
+    {
         ptr = ReturnStack[--ReturnStackDepth];
 
         if (success)
@@ -229,6 +230,8 @@ static inline uintptr_t M68K_Translate(uint16_t *m68kcodeptr)
     uintptr_t hash = (uintptr_t)m68kcodeptr;
     uint32_t *pop_update_loc[EMU68_M68K_INSN_DEPTH];
     uint32_t pop_cnt=0;
+
+    uint16_t *last_rev_jump = (uint16_t *)0xffffffff;
 
     if (RA_GetTempAllocMask())
         kprintf("[ICache] Temporary register alloc mask on translate start is non-zero %x\n", RA_GetTempAllocMask());
@@ -289,6 +292,7 @@ static inline uintptr_t M68K_Translate(uint16_t *m68kcodeptr)
     int break_loop = FALSE;
     int inner_loop = FALSE;
     int soft_break = FALSE;
+    int max_rev_jumps = 0;
 
     while (break_loop == FALSE && soft_break == FALSE && *m68kcodeptr != 0xffff && insn_count < Options.M68K_TRANSLATION_DEPTH)
     {
@@ -439,6 +443,23 @@ static inline uintptr_t M68K_Translate(uint16_t *m68kcodeptr)
         if (disasm)
             disasm_print(in_code, insn_consumed, out_code, 4*(end - out_code), temporary_arm_code);
 
+        if (in_code > m68kcodeptr)
+        {
+            if (debug)
+                kprintf("[ICache]   Going backwards to location %08x\n", m68kcodeptr);
+            if (last_rev_jump == m68kcodeptr) {
+                if (--max_rev_jumps == 0) {
+                    if (debug)
+                        kprintf("[ICache] Going backwards to the same location oft enough. Loop candidate. Breaking here\n");
+                    break;
+                }
+            }
+            else {
+                last_rev_jump = m68kcodeptr;
+                max_rev_jumps = EMU68_MAX_LOOP_COUNT - 1;
+            }
+        }
+
         #if 1
         if (!break_loop && (orig_m68kcodeptr == m68kcodeptr))
         {
@@ -537,8 +558,8 @@ static inline uintptr_t M68K_Translate(uint16_t *m68kcodeptr)
 #endif
     if (inner_loop)
     {
-#ifdef PISTORM
         uint32_t *tmpptr = end;
+#ifdef PISTORM
         *end++ = tbnz(tmp2, 25, arm_code - tmpptr);
 #else
         *end++ = cbz(tmp2, arm_code - tmpptr);
@@ -610,16 +631,11 @@ void *M68K_TranslateNoCache(uint16_t *m68kcodeptr)
 */
 struct M68KTranslationUnit *M68K_VerifyUnit(struct M68KTranslationUnit *unit)
 {
-    struct MD5 m;
-
     if (unit)
     {
-        m = CalcMD5(unit->mt_M68kLow, unit->mt_M68kHigh);
+        uint32_t crc = CalcCRC32(unit->mt_M68kLow, unit->mt_M68kHigh);
 
-        if (m.a != unit->mt_MD5.a ||
-            m.b != unit->mt_MD5.b ||
-            m.c != unit->mt_MD5.c ||
-            m.d != unit->mt_MD5.d)
+        if (crc != unit->mt_CRC32)
         {
             REMOVE(&unit->mt_LRUNode);
             REMOVE(&unit->mt_HashNode);
@@ -738,7 +754,7 @@ struct M68KTranslationUnit *M68K_GetTranslationUnit(uint16_t *m68kcodeptr)
         unit->mt_M68kAddress = orig_m68kcodeptr;
         unit->mt_M68kLow = m68k_low;
         unit->mt_M68kHigh = m68k_high;
-        unit->mt_MD5 = CalcMD5(m68k_low, m68k_high);
+        unit->mt_CRC32 = CalcCRC32(m68k_low, m68k_high);
         unit->mt_PrologueSize = prologue_size;
         unit->mt_EpilogueSize = epilogue_size;
         unit->mt_Conditionals = conditionals_count;
@@ -748,13 +764,12 @@ struct M68KTranslationUnit *M68K_GetTranslationUnit(uint16_t *m68kcodeptr)
         ADDHEAD(&ICache[hash], &unit->mt_HashNode);
 
         if (debug) {
-            struct MD5 m = unit->mt_MD5;
-            kprintf("[ICache]   Block checksum: %08x%08x%08x%08x\n", m.a, m.b, m.c, m.d);
+            kprintf("[ICache]   Block checksum: %08x\n", unit->mt_CRC32);
             kprintf("[ICache]   ARM code at %p\n", unit->mt_ARMEntryPoint);
         }
 
-        arm_flush_cache((uintptr_t)&unit->mt_ARMCode, 4 * unit->mt_ARMInsnCnt);
-        arm_icache_invalidate((intptr_t)unit->mt_ARMEntryPoint, 4 * unit->mt_ARMInsnCnt);
+        arm_flush_cache((uintptr_t)&unit->mt_ARMCode, line_length);
+        arm_icache_invalidate((intptr_t)unit->mt_ARMEntryPoint, line_length);
 
         if (debug)
         {
@@ -883,8 +898,8 @@ uint32_t *EMIT_InjectPrintContext(uint32_t *ptr)
     *ptr++ = ldr64_pcrel(1, 2);
     *ptr++ = br(1);
 
-    *ptr++ = BE32(u.u32[0]);
-    *ptr++ = BE32(u.u32[1]);
+    *ptr++ = u.u32[0];
+    *ptr++ = u.u32[1];
 
     *ptr++ = ldp64(31, 2, 3, 16);
     *ptr++ = ldp64(31, 4, 5, 32);
@@ -932,8 +947,8 @@ uint32_t *EMIT_InjectDebugStringV(uint32_t *ptr, const char * restrict format, v
     *ptr++ = ldr64_pcrel(1, 2);
     *ptr++ = br(1);
 
-    *ptr++ = BE32(u.u32[0]);
-    *ptr++ = BE32(u.u32[1]);
+    *ptr++ = u.u32[0];
+    *ptr++ = u.u32[1];
 
     for (int i=2; i < 30; i += 2)
         *ptr++ = ldp64(31, i, i+1, i*8);

@@ -96,7 +96,7 @@ if (${VARIANT} IN_LIST SUPPORTED_VARIANTS)
         if(${TARGET} STREQUAL "raspi64" OR ${TARGET} STREQUAL "raspi")
             add_compile_definitions(PISTORM)
             include_directories(src/pistorm)
-            list(APPEND TARGET_FILES
+            list(APPEND BASE_FILES
                 src/pistorm/ps_protocol.c
             )
         else()
@@ -109,7 +109,7 @@ else()
 endif()
 
 add_link_options(-Wl,--build-id -nostdlib -nostartfiles -static)
-add_compile_options(-mbig-endian -fno-exceptions -ffreestanding -Wall -Wextra)
+add_compile_options(-mbig-endian -fno-exceptions -ffreestanding -Wall -Wextra -Werror)
 
 if(${TARGET_ARCH} STREQUAL "armhf")
     list(APPEND ARCH_FILES
@@ -130,7 +130,11 @@ else()
     set(CAPSTONE_ARM64_SUPPORT ON CACHE BOOL "CAPSTONE_ARM64_SUPPORT")
     set(LINKER_SCRIPT ${CMAKE_SOURCE_DIR}/scripts/ldscript-be64.lds)
     add_link_options(-Wl,-EB -Wl,--format=elf64-bigaarch64 -T ${LINKER_SCRIPT})
-    add_compile_options(-fomit-frame-pointer -O3 -ffixed-x12)
+    add_compile_options(-march=armv8-a+crc -fomit-frame-pointer -O3 -ffixed-x12)
+
+    if (CMAKE_COMPILER_IS_GNUCC AND CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL 10.0)
+        add_compile_options(-mno-outline-atomics)
+    endif()
 endif()
 
 add_executable(Emu68.elf
@@ -146,20 +150,7 @@ add_custom_command(
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-add_subdirectory(external/tiny-stl)
-
-set(CAPSTONE_BUILD_STATIC_RUNTIME OFF CACHE BOOL "Embed static runtime")
-set(CAPSTONE_BUILD_STATIC ON CACHE BOOL "Build static library")
-set(CAPSTONE_BUILD_SHARED OFF CACHE BOOL "Build shared library")
-set(CAPSTONE_BUILD_DIET OFF CACHE BOOL "Build diet library")
-set(CAPSTONE_BUILD_TESTS OFF CACHE BOOL "Build tests")
-set(CAPSTONE_BUILD_CSTOOL OFF CACHE BOOL "Build cstool")
-set(CAPSTONE_USE_DEFAULT_ALLOC OFF CACHE BOOL "Use default memory allocation functions")
-set(CAPSTONE_ARCHITECTURE_DEFAULT OFF CACHE BOOL "Whether architectures are enabled by default")
-set(CAPSTONE_INSTALL OFF CACHE BOOL "Generate install target")
-set(CAPSTONE_M68K_SUPPORT ON CACHE BOOL "CAPSTONE_M68K_SUPPORT")
-
-add_subdirectory(external/capstone)
+add_subdirectory(external)
 
 target_link_libraries(Emu68.elf tinystl capstone-static)
 target_include_directories(Emu68.elf PRIVATE ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/external/capstone/include)

@@ -300,6 +300,149 @@ int limit_2g = 0;
 #include "ps_protocol.h"
 #endif
 
+void _secondary_start();
+asm(
+"       .balign  32                 \n"
+"       .globl  _secondary_start    \n"
+"_secondary_start:                  \n"
+"       mrs     x9, CurrentEL       \n" /* Since we do not use EL2 mode yet, we fall back to EL1 immediately */
+"       and     x9, x9, #0xc        \n"
+"       cmp     x9, #8              \n"
+"       b.eq    _sec_leave_EL2      \n" /* In case of EL2 or EL3 switch back to EL1 */
+"       b.gt    _sec_leave_EL3      \n"
+"_sec_continue_boot:                \n"
+
+"       adrp    x9, temp_stack      \n" /* Set up stack */
+"       add     x9, x9, #:lo12:temp_stack\n"
+"       ldr     x9, [x9]            \n"
+"       mov     sp, x9              \n"
+
+"2:     ldr     x30, =secondary_boot\n"
+"       br      x30                 \n"
+
+"_sec_leave_EL3:                    \n"
+#if EMU68_HOST_BIG_ENDIAN
+"       mrs     x10, SCTLR_EL3      \n" /* If necessary, set endianess of EL3 before fetching any data */
+"       orr     x10, x10, #(1 << 25)\n"
+"       msr     SCTLR_EL3, x10      \n"
+#endif
+"       adr     x10, _sec_leave_EL2 \n" /* Fallback to continue_boot in EL2 here below */
+"       msr     ELR_EL3, x10        \n"
+"       ldr     w10, =0x000003c9    \n"
+"       msr     SPSR_EL3, x10       \n"
+"       eret                        \n"
+
+"_sec_leave_EL2:                    \n"
+#if EMU68_HOST_BIG_ENDIAN
+"       mrs     x10, SCTLR_EL2      \n" /* If necessary, set endianess of EL2 before fetching any data */
+"       orr     x10, x10, #(1 << 25)\n"
+"       msr     SCTLR_EL2, x10      \n"
+"       mrs     x10, SCTLR_EL1      \n" /* If necessary, set endianess of EL1 and EL0 before fetching any data */
+"       orr     x10, x10, #(1 << 25) | (1 << 24)\n"
+"       msr     SCTLR_EL1, x10      \n"
+#endif
+"       mrs     x10, MDCR_EL2       \n" /* Enable event counters */
+"       orr     x10, x10, #0x80     \n"
+"       msr     MDCR_EL2, x10       \n"
+"       mov     x10, #3             \n" /* Enable CNTL access from EL1 and EL0 */
+"       msr     CNTHCTL_EL2, x10    \n"
+"       mov     x10, #0x80000000    \n" /* EL1 is AArch64 */
+"       msr     HCR_EL2, x10        \n"
+"       ldr     x10, =_sec_continue_boot  \n" /* Fallback to continue_boot in EL1 */
+"       msr     ELR_EL2, x10        \n"
+"       ldr     w10, =0x000003c5    \n"
+"       msr     SPSR_EL2, x10       \n"
+
+"       mov     x10, #0x00300000    \n" /* Enable signle and double VFP coprocessors in EL1 and EL0 */
+"       msr     CPACR_EL1, x10      \n"
+                                        /* Attr0 - write-back cacheable RAM, Attr1 - device, Attr2 - non-cacheable */
+"       ldr     x10, =" xstr(ATTR_CACHED | (ATTR_DEVICE_nGnRE << 8) | (ATTR_NOCACHE << 16)) "\n"
+"       msr     MAIR_EL1, x10       \n" /* Set memory attributes */
+
+"       ldr     x10, =0xb5193519    \n" /* Upper and lower enabled, both 39bit in size */
+"       msr     TCR_EL1, x10        \n"
+
+"       adrp    x10, mmu_user_L1    \n" /* Load table pointers for low and high memory regions */
+"       msr     TTBR0_EL1, x10      \n"
+"       adrp    x10, mmu_kernel_L1  \n"
+"       msr     TTBR1_EL1, x10      \n"
+
+"       mrs     x10, SCTLR_EL1      \n"
+"       orr     x10, x10, #1        \n"
+"       msr     SCTLR_EL1, x10      \n"
+
+"       eret                        \n"
+"       .ltorg                      \n"
+);
+
+volatile uint64_t temp_stack;
+volatile uint8_t boot_lock;
+
+void serial_writer();
+
+void secondary_boot(void)
+{
+    uint64_t cpu_id;
+    uint64_t tmp;
+    of_node_t *e = NULL;
+    int async_log = 0;
+
+    asm volatile("mrs %0, MPIDR_EL1":"=r"(cpu_id));
+   
+    cpu_id &= 3;
+    
+    /* Enable caches and cache maintenance instructions from EL0 */
+    asm volatile("mrs %0, SCTLR_EL1":"=r"(tmp));
+    tmp |= (1 << 2) | (1 << 12);    // Enable D and I caches
+    tmp |= (1 << 26);               // Enable Cache clear instructions from EL0
+    tmp &= ~0x18;                   // Disable stack alignment check
+    asm volatile("msr SCTLR_EL1, %0"::"r"(tmp));
+
+    asm volatile("msr VBAR_EL1, %0"::"r"((uintptr_t)&__vectors_start));
+
+    asm volatile("mrs %0, CNTFRQ_EL0":"=r"(tmp));
+
+    asm volatile("mrs %0, PMCR_EL0":"=r"(tmp));
+    tmp |= 5; // Enable event counting and reset cycle counter
+    asm volatile("msr PMCR_EL0, %0; isb"::"r"(tmp));
+    tmp = 0x80000000; // Enable cycle counter
+    asm volatile("msr PMCNTENSET_EL0, %0; isb"::"r"(tmp));
+
+    kprintf("[BOOT] Started CPU%d\n", cpu_id);
+    
+    if (cpu_id == 1)
+    {
+        e = dt_find_node("/chosen");
+        if (e)
+        {
+            of_property_t * prop = dt_find_property(e, "bootargs");
+            if (prop)
+            {
+                if (strstr(prop->op_value, "async_log"))
+                    async_log = 1;
+            }
+        }
+    }
+
+    __atomic_clear(&boot_lock, __ATOMIC_RELEASE);
+
+#ifdef PISTORM
+    if (cpu_id == 1)
+    {
+        if (async_log)
+            serial_writer();
+    }
+    else if (cpu_id == 2)
+    {
+        ps_housekeeper();
+    }
+#else
+    (void)async_log;
+#endif
+
+    while(1) { asm volatile("wfe"); }
+}
+
 void boot(void *dtree)
 {
     uintptr_t kernel_top_virt = ((uintptr_t)boot + (KERNEL_SYS_PAGES << 21)) & ~((1 << 21)-1);
@@ -308,6 +451,9 @@ void boot(void *dtree)
     uintptr_t top_of_ram = 0;
     of_property_t *p = NULL;
     of_node_t *e = NULL;
+    void *initramfs_loc = NULL;
+    uintptr_t initramfs_size = 0;
+    boot_lock = 0;
 
     /* Enable caches and cache maintenance instructions from EL0 */
     asm volatile("mrs %0, SCTLR_EL1":"=r"(tmp));
@@ -332,6 +478,30 @@ void boot(void *dtree)
                 enable_cache = 1;
             if (strstr(prop->op_value, "limit_2g"))
                 limit_2g = 1;
+        }
+    }
+
+    /*
+        At this place we have local memory manager but no MMU set up yet. 
+        Nevertheless, attempt to copy initrd image to safe location since it is not guarded in RAM
+    */
+    e = dt_find_node("/chosen");
+
+    if (e)
+    {
+        void *image_start, *image_end;
+        of_property_t *p = dt_find_property(e, "linux,initrd-start");
+
+        if (p)
+        {
+            image_start = (void*)(intptr_t)BE32(*(uint32_t*)p->op_value);
+            p = dt_find_property(e, "linux,initrd-end");
+            image_end = (void*)(intptr_t)BE32(*(uint32_t*)p->op_value);
+
+            initramfs_size = (uintptr_t)image_end - (uintptr_t)image_start;
+            initramfs_loc = tlsf_malloc(tlsf, initramfs_size);
+
+            DuffCopy(initramfs_loc, (void*)(0xffffff9000000000 + (uintptr_t)image_start), initramfs_size / 4);
         }
     }
 
@@ -465,7 +635,52 @@ void boot(void *dtree)
         move_kernel(kernel_old_loc, kernel_new_loc);
 
         kprintf("[BOOT] Kernel moved, MMU tables updated\n");
+
+        uint64_t TTBR0, TTBR1;
+
+        asm volatile("mrs %0, TTBR0_EL1; mrs %1, TTBR1_EL1":"=r"(TTBR0), "=r"(TTBR1));
+
+        kprintf("[BOOT] MMU tables at %p and %p\n", TTBR0, TTBR1);
+
+        const uint32_t tlb_flusher[] = {
+            LE32(0xd5033b9f),       // dsb   ish
+            LE32(0xd508831f),       // tlbi  vmalle1is
+            LE32(0xd5033f9f),       // dsb   sy
+            LE32(0xd5033fdf),       // isb
+            LE32(0xd65f03c0)        // ret
+        };
+
+        void *addr = tlsf_malloc(jit_tlsf, 4*5);
+        void (*flusher)() = (void (*)())((uintptr_t)addr | 0x1000000000);
+        DuffCopy(addr, tlb_flusher, 5);
+        arm_flush_cache((uintptr_t)addr, 4*5);
+        flusher();
+        tlsf_free(jit_tlsf, addr);
     }
+
+    while(__atomic_test_and_set(&boot_lock, __ATOMIC_ACQUIRE)) asm volatile("yield");
+    kprintf("[BOOT] Waking up CPU 1\n");
+    temp_stack = (uintptr_t)tlsf_malloc(tlsf, 65536) + 65536;
+    *(uint64_t *)0xffffff90000000e0 = LE64(mmu_virt2phys((intptr_t)_secondary_start));
+    clear_entire_dcache();
+        
+    kprintf("[BOOT] Boot address set to %p, stack at %p\n", LE64(*(uint64_t*)0xffffff90000000e0), temp_stack);
+
+    asm volatile("sev");
+
+    while(__atomic_test_and_set(&boot_lock, __ATOMIC_ACQUIRE)) { asm volatile("yield"); }
+
+    kprintf("[BOOT] Waking up CPU 2\n");
+    temp_stack = (uintptr_t)tlsf_malloc(tlsf, 65536) + 65536;
+    *(uint64_t *)0xffffff90000000e8 = LE64(mmu_virt2phys((intptr_t)_secondary_start));
+    clear_entire_dcache();
+        
+    kprintf("[BOOT] Boot address set to %p, stack at %p\n", LE64(*(uint64_t*)0xffffff90000000e0), temp_stack);
+
+    asm volatile("sev");
+
+    while(__atomic_test_and_set(&boot_lock, __ATOMIC_ACQUIRE)) { asm volatile("yield"); }
+    __atomic_clear(&boot_lock, __ATOMIC_RELEASE);
 
     asm volatile("msr VBAR_EL1, %0"::"r"((uintptr_t)&__vectors_start));
     kprintf("[BOOT] VBAR set to %p\n", (uintptr_t)&__vectors_start);
@@ -517,21 +732,17 @@ void boot(void *dtree)
     platform_post_init();
 
 #ifndef PISTORM
-    e = dt_find_node("/chosen");
-
-    if (e)
+    if (initramfs_loc != NULL && initramfs_size != 0)
     {
         void *image_start, *image_end;
-        of_property_t *p = dt_find_property(e, "linux,initrd-start");
         void *fdt = (void*)(top_of_ram - ((dt_total_size() + 4095) & ~4095));
         memcpy(fdt, dt_fdt_base(), dt_total_size());
         top_of_ram -= (dt_total_size() + 4095) & ~4095;
 
-        if (p)
+        if (initramfs_loc)
         {
-            image_start = (void*)(intptr_t)BE32(*(uint32_t*)p->op_value);
-            p = dt_find_property(e, "linux,initrd-end");
-            image_end = (void*)(intptr_t)BE32(*(uint32_t*)p->op_value);
+            image_start = initramfs_loc;
+            image_end = (void*)((intptr_t)initramfs_loc + initramfs_size);
             uint32_t magic = BE32(*(uint32_t*)image_start);
             void *ptr = NULL;
 
@@ -622,6 +833,8 @@ void boot(void *dtree)
                 }
             }
 
+            tlsf_free(tlsf, initramfs_loc);
+
             if (ptr)
                 M68K_StartEmu(ptr, fdt);
         }
@@ -634,38 +847,30 @@ void boot(void *dtree)
 
 #else
 
-    e = dt_find_node("/chosen");
-
-    if (e)
+    if (initramfs_loc != NULL && initramfs_size != 0)
     {
         extern uint32_t rom_mapped;
 
-        void *image_start, *image_end;
-        of_property_t *p = dt_find_property(e, "linux,initrd-start");
-
-        // Check if initrd was given. If yes, use it as a new ROM
-        if (p)
-        {
-            image_start = (void*)(intptr_t)BE32(*(uint32_t*)p->op_value);
-            p = dt_find_property(e, "linux,initrd-end");
-            image_end = (void*)(intptr_t)BE32(*(uint32_t*)p->op_value);
-
-            mmu_map(0xf80000, 0xf80000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR(0), 0);
+        kprintf("[BOOT] Loading ROM from %p\n", initramfs_loc);
+        mmu_map(0xf80000, 0xf80000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR(0), 0);
             
-            if ((uintptr_t)image_end - (uintptr_t)image_start == 262144)
-            {
-                DuffCopy((void*)0xffffff9000f80000, image_start, 262144 / 4);
-                DuffCopy((void*)0xffffff9000fc0000, image_start, 262144 / 4);
-            }
-            else
-            {
-                DuffCopy((void*)0xffffff9000f80000, image_start, 524288 / 4);
-            }
-
-            rom_mapped = 1;
+        if (initramfs_size == 262144)
+        {
+            DuffCopy((void*)0xffffff9000f80000, initramfs_loc, 262144 / 4);
+            DuffCopy((void*)0xffffff9000fc0000, initramfs_loc, 262144 / 4);
         }
+        else
+        {
+            DuffCopy((void*)0xffffff9000f80000, initramfs_loc, 524288 / 4);
+        }
+
+        rom_mapped = 1;
+
+        tlsf_free(tlsf, initramfs_loc);
     }
-        
+
+    extern volatile int housekeeper_enabled;
+    housekeeper_enabled = 1;
     M68K_StartEmu(0, NULL);
 
 #endif
@@ -860,7 +1065,7 @@ struct M68KTranslationUnit *_FindUnit(uint16_t *ptr)
     return M68K_FindTranslationUnit(ptr);
 }
 
-void stub_FindUnit()
+void  __attribute__((used)) stub_FindUnit()
 {
     asm volatile(
 "FindUnit:                                  \n"
@@ -894,7 +1099,10 @@ void stub_FindUnit()
 ::[reg_pc]"i"(REG_PC));
 }
 
-void stub_ExecutionLoop()
+uint32_t last_pc;
+extern volatile int ipl0;
+
+void  __attribute__((used)) stub_ExecutionLoop()
 {
     asm volatile(
 "ExecutionLoop:                             \n"
@@ -911,10 +1119,18 @@ void stub_ExecutionLoop()
 "       mrs     x2, TPIDR_EL1               \n"
 "       cbz     w%[reg_pc], 4f              \n"
 
+"       adrp    x1, last_pc                 \n"
+"       add     x1, x1, :lo12:last_pc       \n"
+"       str     w18, [x1]                   \n"
+
+
 #ifdef PISTORM
-"       mov     x1, #0xf2200000             \n" // Read IPL0 flag from GPIO
-"       ldr     w1, [x1, 0x34]              \n"
-"       tbz     w1, #25, 9f                 \n" // If IPL0 flag is not set, go to interrupt handling
+"       adrp    x1, ipl0                    \n"
+"       ldr     w1, [x1, :lo12:ipl0]        \n"
+"       cbz     w1, 9f                      \n"
+//"       mov     x1, #0xf2200000             \n" // Read IPL0 flag from GPIO
+//"       ldr     w1, [x1, 0x34]              \n"
+//"       tbz     w1, #25, 9f                 \n" // If IPL0 flag is not set, go to interrupt handling
 #else
 "       ldr     w1, [x0, #%[pint]]          \n" // Load pending interrupt flag
 "       cbnz    w1, 9f                      \n" // Change context if interrupt was pending
@@ -1182,7 +1398,8 @@ void M68K_StartEmu(void *addr, void *fdt)
     //*(uint32_t*)4 = 0;
 
 #ifdef PISTORM
-
+    (void)fdt;
+    
     asm volatile("mov %0, #0":"=r"(addr));
 
     __m68k.ISP.u32 = BE32(*((uint32_t*)addr));
@@ -1210,17 +1427,38 @@ void M68K_StartEmu(void *addr, void *fdt)
         {
             if (strstr(prop->op_value, "enable_cache"))
                 __m68k.CACR = BE32(0x80008000);
-        }
-    }
+            if (strstr(prop->op_value, "enable_c0_slow"))
+                mmu_map(0xC00000, 0xC00000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_ATTR(0), 0);
+            if (strstr(prop->op_value, "enable_c8_slow"))
+                mmu_map(0xC80000, 0xC80000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_ATTR(0), 0);
+            if (strstr(prop->op_value, "enable_d0_slow"))
+                mmu_map(0xd00000, 0xd00000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_ATTR(0), 0);
 
-    asm volatile("svc #0x100");
-    asm volatile("svc #0x110");
-    asm volatile("svc #0x0");
+
+            extern int disasm;
+            extern int debug;
+
+            if (strstr(prop->op_value, "debug"))
+                debug = 1;
+                
+            if (strstr(prop->op_value, "disassemble"))
+                disasm = 1;
+        }       
+    }
 
     kprintf("[JIT]\n");
     M68K_PrintContext(&__m68k);
 
     kprintf("[JIT] Let it go...\n");
+
+
+    clear_entire_dcache();
+
+asm volatile(
+"       dsb     ish                 \n"
+"       tlbi    VMALLE1IS           \n" /* Flush tlb */
+"       dsb     sy                  \n"
+"       isb                         \n");
 
     asm volatile("mrs %0, CNTPCT_EL0":"=r"(t1));
     asm volatile("mrs %0, PMCCNTR_EL0":"=r"(cnt1));
@@ -1272,7 +1510,7 @@ void M68K_StartEmu(void *addr, void *fdt)
     frq = frq & 0xffffffff;
     kprintf("[JIT] Time spent in m68k mode: %lld us\n", 1000000 * (t2-t1) / frq);
 
-    kprintf("[JIT] Back from translated code\n");
+    kprintf("[JIT] Back from translated code, last valid PC=%08x\n", last_pc);
 
     kprintf("[JIT]\n");
     M68K_PrintContext(&__m68k);

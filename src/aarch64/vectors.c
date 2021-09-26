@@ -45,7 +45,8 @@
     "       stp x24, x25, [sp, #12*16]      \n" \
     "       stp x26, x27, [sp, #13*16]      \n" \
     "       stp x28, x29, [sp, #14*16]      \n" \
-    "       str x30, [sp, #15*16]           \n"
+    "       mov x0, sp                      \n" \
+    "       stp x30, x0, [sp, #15*16]       \n"
 
 #define LOAD_FULL_CONTEXT \
     "       ldp x2, x3, [sp, #1*16]         \n" \
@@ -86,8 +87,8 @@
 #endif
 
 
-void __stub_vectors()
-{ asm(
+void  __attribute__((used)) __stub_vectors()
+{ asm volatile(
 "       .section .vectors               \n"
 "       .balign 0x800                   \n"
 "curr_el_sp0_sync:                      \n" // The exception handler for a synchronous 
@@ -285,9 +286,6 @@ int SYSWriteValToAddr(uint64_t value, int size, uint64_t far)
         kprintf("Illegal FAR %08x\n", far);
         return 1;
     }
-
-    if (far == 0xdff032 && size == 2)
-        return 1;
 
     if (far == 0xBFE001 && size == 1) {
         if ((value & 1) != overlay) {
@@ -871,6 +869,36 @@ int SYSPageFaultHandler(uint32_t vector, uint64_t *ctx, uint64_t elr, uint64_t s
                 }
             }
         }
+        /* LDURSW/LDURSB/LDURSH immediate */
+        else if ((opcode & 0x3fa00c00) == 0x38800000)
+        {
+            int sext64 = 1;
+            if (opcode & (1 << 22))
+                sext64 = 0;
+            
+            handled = SYSReadValFromAddr(&ctx[opcode & 31], size, far);
+            if (handled) {
+                int sext = 0;
+                switch (size)
+                {
+                    case 1:
+                        sext = ctx[opcode & 31] & 0x80;
+                        if (sext) ctx[opcode & 31] |= 0xffffff00;
+                        break;
+                    case 2:
+                        sext = ctx[opcode & 31] & 0x8000;
+                        if (sext) ctx[opcode & 31] |= 0xffff0000;
+                        break;
+                    case 4:
+                        sext = ctx[opcode & 31] & 0x80000000;
+                        break;
+                }
+
+                if (sext && sext64) {
+                    ctx[opcode & 31] |= 0xffffffff00000000ULL;
+                }
+            }
+        }
         /* LDRSW/LDRSB/LDRSH post- and pre-index */
         else if ((opcode & 0x3fa00400) == 0x38800400)
         {
@@ -952,6 +980,10 @@ void SYSHandler(uint32_t vector, uint64_t *ctx)
 
         if ((esr & 0xffff) == 0x101)
         {
+            uint64_t sr;
+
+            asm volatile("mrs %0, tpidr_el0":"=r"(sr));
+
             kprintf("[JIT:SYS] M68k RegDump:\n[JIT] ");
             int reg_dn[] = {REG_D0, REG_D1, REG_D2, REG_D3, REG_D4, REG_D5, REG_D6, REG_D7};
             int reg_an[] = {REG_A0, REG_A1, REG_A2, REG_A3, REG_A4, REG_A5, REG_A6, REG_A7};
@@ -971,9 +1003,6 @@ void SYSHandler(uint32_t vector, uint64_t *ctx)
             kprintf("\n[JIT] ");
 
             kprintf("    PC = 0x%08x    SR = ", BE32(ctx[REG_PC]));
-            uint64_t sr;
-
-            asm volatile("mrs %0, tpidr_el0":"=r"(sr));
 
             kprintf("T%d|", sr >> 14);
     

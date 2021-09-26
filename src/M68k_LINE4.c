@@ -13,10 +13,18 @@
 
 uint32_t *EMIT_MUL_DIV(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr);
 
+uint32_t *EMIT_MUL_DIV_(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_t *insn_consumed)
+{
+    (void)insn_consumed;
+    return EMIT_MUL_DIV(ptr, opcode, m68k_ptr);
+}
+
+
 extern uint32_t insn_count;
 
-uint32_t *EMIT_CLR(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
+uint32_t *EMIT_CLR(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
+    (void)insn_consumed;
     uint8_t update_mask = M68K_GetSRMask(*m68k_ptr - 1);
     uint8_t ext_count = 0;
     uint8_t size = 1;
@@ -91,8 +99,9 @@ uint32_t *EMIT_CLR(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     return ptr;
 }
 
-uint32_t *EMIT_NOT(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
+uint32_t *EMIT_NOT(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
+    (void)insn_consumed;
     uint8_t update_mask = M68K_GetSRMask(*m68k_ptr - 1);
     uint8_t ext_count = 0;
     uint8_t dest = 0xff;
@@ -288,8 +297,9 @@ uint32_t *EMIT_NOT(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     return ptr;
 }
 
-uint32_t *EMIT_NEG(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
+uint32_t *EMIT_NEG(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
+    (void)insn_consumed;
     uint8_t update_mask = M68K_GetSRMask(*m68k_ptr - 1);
     uint8_t ext_count = 0;
     uint8_t dest = 0xff;
@@ -485,8 +495,9 @@ uint32_t *EMIT_NEG(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     return ptr;
 }
 
-uint32_t *EMIT_NEGX(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
+uint32_t *EMIT_NEGX(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
+    (void)insn_consumed;
     uint8_t update_mask = M68K_GetSRMask(*m68k_ptr - 1);
     uint8_t ext_count = 0;
     uint8_t dest = 0xff;
@@ -685,8 +696,9 @@ uint32_t *EMIT_NEGX(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     return ptr;
 }
 
-uint32_t *EMIT_TST(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
+uint32_t *EMIT_TST(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
+    (void)insn_consumed;
     uint8_t update_mask = M68K_GetSRMask(*m68k_ptr - 1);
     uint8_t ext_count = 0;
     uint8_t immed = RA_AllocARMRegister(&ptr);
@@ -796,8 +808,9 @@ uint32_t *EMIT_TST(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     return ptr;
 }
 
-uint32_t *EMIT_TAS(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
+uint32_t *EMIT_TAS(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
+    (void)insn_consumed;
     uint8_t update_mask = M68K_GetSRMask(*m68k_ptr - 1);
     uint8_t ext_count = 0;
     uint8_t dest = 0xff;
@@ -882,8 +895,9 @@ uint32_t *EMIT_TAS(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     return ptr;
 }
 
-static uint32_t *EMIT_MOVEfromSR(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
+static uint32_t *EMIT_MOVEfromSR(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
+    (void)insn_consumed;
 #ifdef __aarch64__
     uint8_t cc = RA_ModifyCC(&ptr);
     uint8_t ext_words = 0;
@@ -923,8 +937,9 @@ static uint32_t *EMIT_MOVEfromSR(uint32_t *ptr, uint16_t opcode, uint16_t **m68k
     return ptr;
 }
 
-static uint32_t *EMIT_MOVEfromCCR(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
+static uint32_t *EMIT_MOVEfromCCR(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
+    (void)insn_consumed;
 #ifdef __aarch64__
     uint8_t cc = RA_GetCC(&ptr);
     uint8_t ext_words = 0;
@@ -961,8 +976,9 @@ static uint32_t *EMIT_MOVEfromCCR(uint32_t *ptr, uint16_t opcode, uint16_t **m68
     return ptr;
 }
 
-static uint32_t *EMIT_MOVEtoSR(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
+static uint32_t *EMIT_MOVEtoSR(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
+    (void)insn_consumed;
 #ifdef __aarch64__
     uint8_t ext_words = 0;
     uint8_t src = 0xff;
@@ -1048,8 +1064,9 @@ static uint32_t *EMIT_MOVEtoSR(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_p
     return ptr;
 }
 
-static uint32_t *EMIT_MOVEtoCCR(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
+static uint32_t *EMIT_MOVEtoCCR(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
+    (void)insn_consumed;
 #ifdef __aarch64__
     uint8_t ext_words = 0;
     uint8_t src = 0xff;
@@ -1072,13 +1089,28 @@ static uint32_t *EMIT_MOVEtoCCR(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_
     return ptr;
 }
 
-static uint32_t *EMIT_EXT(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
+static uint32_t *EMIT_EXT(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
-    uint8_t update_mask = M68K_GetSRMask(*m68k_ptr - 1);
+    uint8_t update_mask;
     uint8_t reg = RA_MapM68kRegister(&ptr, opcode & 7);
     uint8_t tmp = reg;
     RA_SetDirtyM68kRegister(&ptr, opcode & 7);
     uint8_t mode = (opcode >> 6) & 7;
+
+    /* 
+        If current instruction is byte-to-word and subsequent is word-to-long on the same register,
+        then combine both to extb.l 
+    */
+
+    if ((mode == 2) && (opcode ^ BE16((*m68k_ptr)[0])) == 0x40) {
+        (*m68k_ptr)++;
+        mode = 7;
+        (*insn_consumed)++;
+        ptr = EMIT_AdvancePC(ptr, 2);
+    } 
+
+    /* Get update mask at this point first, otherwise the mask would suggest that flag change is not necessary */
+    update_mask = M68K_GetSRMask(*m68k_ptr - 1);
 
     switch (mode)
     {
@@ -1130,8 +1162,9 @@ static uint32_t *EMIT_EXT(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     return ptr;
 }
 
-static uint32_t *EMIT_LINK32(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
+static uint32_t *EMIT_LINK32(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
+    (void)insn_consumed;
     uint8_t sp;
     uint8_t displ;
     uint8_t reg;
@@ -1160,8 +1193,9 @@ static uint32_t *EMIT_LINK32(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr
     return ptr;
 }
 
-static uint32_t *EMIT_LINK16(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
+static uint32_t *EMIT_LINK16(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
+    (void)insn_consumed;
     uint8_t sp;
     uint8_t displ;
     uint8_t reg;
@@ -1204,8 +1238,9 @@ static uint32_t *EMIT_LINK16(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr
     return ptr;
 }
 
-static uint32_t *EMIT_SWAP(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
+static uint32_t *EMIT_SWAP(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
+    (void)insn_consumed;
     uint8_t update_mask = M68K_GetSRMask(*m68k_ptr - 1);
     uint8_t reg = RA_MapM68kRegister(&ptr, opcode & 7);
     RA_SetDirtyM68kRegister(&ptr, opcode & 7);
@@ -1233,8 +1268,9 @@ static uint32_t *EMIT_SWAP(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     return ptr;
 }
 
-static uint32_t *EMIT_ILLEGAL(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
+static uint32_t *EMIT_ILLEGAL(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
+    (void)insn_consumed;
     (void)opcode;
 
     /* Illegal generates exception. Always */
@@ -1246,10 +1282,10 @@ static uint32_t *EMIT_ILLEGAL(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_pt
     return ptr;
 }
 
-static uint32_t *EMIT_TRAP(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
+static uint32_t *EMIT_TRAP(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
-    /* Correct implementation is missing */
-    ptr = EMIT_InjectDebugString(ptr, "[JIT] TRAP #%02d at %08x\n", opcode & 15, (*m68k_ptr) - 1);
+    (void)insn_consumed;
+    (void)m68k_ptr;
 
     ptr = EMIT_AdvancePC(ptr, 2);
     ptr = EMIT_FlushPC(ptr);
@@ -1261,8 +1297,9 @@ static uint32_t *EMIT_TRAP(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     return ptr;
 }
 
-static uint32_t *EMIT_UNLK(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
+static uint32_t *EMIT_UNLK(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
+    (void)insn_consumed;
     uint8_t sp;
     uint8_t reg;
 
@@ -1282,13 +1319,15 @@ static uint32_t *EMIT_UNLK(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     return ptr;
 }
 
-static uint32_t *EMIT_RESET(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
+static uint32_t *EMIT_RESET(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
+    (void)insn_consumed;
     (void)opcode;
     (void)m68k_ptr;
 
 #ifdef __aarch64__
     uint32_t *tmp;
+    uint32_t *tmp2;
     ptr = EMIT_FlushPC(ptr);
     uint8_t cc = RA_ModifyCC(&ptr);
 
@@ -1303,6 +1342,9 @@ static uint32_t *EMIT_RESET(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
 
     /* No supervisor. Update USP, generate exception */
     ptr = EMIT_Exception(ptr, VECTOR_PRIVILEGE_VIOLATION, 0);
+
+    tmp2 = ptr;
+    *ptr++ = b_cc(A64_CC_AL, 0);
 
     *tmp = b_cc(A64_CC_AL, ptr - tmp);
 
@@ -1322,12 +1364,12 @@ static uint32_t *EMIT_RESET(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
         *ptr++ = stp64(31, i, i+1, i*8);
     *ptr++ = str64_offset(31, 30, 240);
 
-    *ptr++ = adr(30, 16);
+    *ptr++ = adr(30, 20);
     *ptr++ = ldr64_pcrel(1, 2);
     *ptr++ = br(1);
 
-    *ptr++ = BE32(u.u32[0]);
-    *ptr++ = BE32(u.u32[1]);
+    *ptr++ = u.u32[0];
+    *ptr++ = u.u32[1];
 
     for (int i=2; i < 30; i += 2)
         *ptr++ = ldp64(31, i, i+1, i*8);
@@ -1336,7 +1378,9 @@ static uint32_t *EMIT_RESET(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
 
 #endif
 
-    *ptr++ = (uint32_t)(uintptr_t)tmp;
+    *tmp2 = b_cc(A64_CC_AL, ptr - tmp2);
+
+    *ptr++ = (uint32_t)(uintptr_t)tmp2;
     *ptr++ = 1;
     *ptr++ = 0;
     *ptr++ = INSN_TO_LE(0xfffffffe);
@@ -1352,20 +1396,22 @@ static uint32_t *EMIT_RESET(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     return ptr;
 }
 
-static uint32_t *EMIT_NOP(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
+static uint32_t *EMIT_NOP(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
+    (void)insn_consumed;
     (void)opcode;
     (void)m68k_ptr;
 
-    *ptr++ = nop();
+    *ptr++ = dsb_sy();
     ptr = EMIT_AdvancePC(ptr, 2);
     ptr = EMIT_FlushPC(ptr);
 
     return ptr;
 }
 
-static uint32_t *EMIT_STOP(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
+static uint32_t *EMIT_STOP(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
+    (void)insn_consumed;
     (void)opcode;
 
 #ifdef __aarch64__
@@ -1464,8 +1510,9 @@ static uint32_t *EMIT_STOP(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     return ptr;
 }
 
-static uint32_t *EMIT_RTE(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
+static uint32_t *EMIT_RTE(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
+    (void)insn_consumed;
     (void)opcode;
     (void)m68k_ptr;
 
@@ -1555,8 +1602,9 @@ static uint32_t *EMIT_RTE(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     return ptr;
 }
 
-static uint32_t *EMIT_RTD(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
+static uint32_t *EMIT_RTD(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
+    (void)insn_consumed;
     (void)opcode;
     (void)m68k_ptr;
 
@@ -1585,8 +1633,9 @@ static uint32_t *EMIT_RTD(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     return ptr;
 }
 
-static uint32_t *EMIT_RTS(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
+static uint32_t *EMIT_RTS(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
+    (void)insn_consumed;
     (void)opcode;
 
     uint8_t sp = RA_MapM68kRegister(&ptr, 15);
@@ -1611,8 +1660,9 @@ static uint32_t *EMIT_RTS(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     return ptr;
 }
 
-static uint32_t *EMIT_TRAPV(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
+static uint32_t *EMIT_TRAPV(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
+    (void)insn_consumed;
     (void)opcode;
 
     uint8_t cc = RA_GetCC(&ptr);
@@ -1635,8 +1685,9 @@ static uint32_t *EMIT_TRAPV(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     return ptr;
 }
 
-static uint32_t *EMIT_RTR(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
+static uint32_t *EMIT_RTR(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
+    (void)insn_consumed;
     (void)opcode;
     (void)m68k_ptr;
 
@@ -1666,8 +1717,9 @@ static uint32_t *EMIT_RTR(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     return ptr;
 }
 
-static uint32_t *EMIT_MOVEC(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
+static uint32_t *EMIT_MOVEC(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
+    (void)insn_consumed;
 #ifdef __aarch64__
     uint16_t opcode2 = BE16((*m68k_ptr)[0]);
     uint8_t dr = opcode & 1;
@@ -1824,8 +1876,9 @@ static uint32_t *EMIT_MOVEC(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     return ptr;
 }
 
-static uint32_t *EMIT_MOVEUSP(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
+static uint32_t *EMIT_MOVEUSP(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
+    (void)insn_consumed;
     (void)m68k_ptr;
 
 #ifdef __aarch64__
@@ -1871,8 +1924,9 @@ static uint32_t *EMIT_MOVEUSP(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_pt
     return ptr;
 }
 
-static uint32_t *EMIT_JSR(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
+static uint32_t *EMIT_JSR(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
+    (void)insn_consumed;
     uint8_t ext_words = 0;
     uint8_t ea = 0xff;
     uint8_t sp = 0xff;
@@ -1892,8 +1946,9 @@ static uint32_t *EMIT_JSR(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     return ptr;
 }
 
-static uint32_t *EMIT_JMP(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
+static uint32_t *EMIT_JMP(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
+    (void)insn_consumed;
     uint8_t ext_words = 0;
     uint8_t ea = REG_PC;
 
@@ -1906,8 +1961,9 @@ static uint32_t *EMIT_JMP(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     return ptr;
 }
 
-static uint32_t *EMIT_NBCD(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
+static uint32_t *EMIT_NBCD(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
+    (void)insn_consumed;
 #ifdef __aarch64__
     uint8_t ext_words = 0;
     uint8_t tmp = RA_AllocARMRegister(&ptr);
@@ -2012,8 +2068,9 @@ static uint32_t *EMIT_NBCD(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     return ptr;
 }
 
-static uint32_t *EMIT_PEA(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
+static uint32_t *EMIT_PEA(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
+    (void)insn_consumed;
     uint8_t sp = 0xff;
     uint8_t ea = 0xff;
     uint8_t ext_words = 0;
@@ -2034,8 +2091,9 @@ static uint32_t *EMIT_PEA(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     return ptr;
 }
 
-static uint32_t *EMIT_MOVEM(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
+static uint32_t *EMIT_MOVEM(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
+    (void)insn_consumed;
     uint8_t dir = (opcode >> 10) & 1;
     uint8_t size = (opcode >> 6) & 1;
     uint16_t mask = BE16((*m68k_ptr)[0]);
@@ -2269,8 +2327,9 @@ static uint32_t *EMIT_MOVEM(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     return ptr;
 }
 
-static uint32_t *EMIT_LEA(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
+static uint32_t *EMIT_LEA(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
+    (void)insn_consumed;
     uint8_t dest = 0xff;
     uint8_t ea = 0xff;
     uint8_t ext_words = 0;
@@ -2299,8 +2358,9 @@ static uint32_t *EMIT_LEA(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     return ptr;
 }
 
-static uint32_t *EMIT_CHK(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
+static uint32_t *EMIT_CHK(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
+    (void)insn_consumed;
 #ifdef __aarch64__
     uint32_t opcode_address = (uint32_t)(uintptr_t)((*m68k_ptr) - 1);
     uint8_t ext_words = 0;
@@ -2365,7 +2425,7 @@ static uint32_t *EMIT_CHK(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     return ptr;
 }
 
-static EMIT_Function JumpTable[4096] = {
+static EMIT_MultiFunction JumpTable[4096] = {
     [0x0c0 ... 0x0c7] = EMIT_MOVEfromSR,
     [0x0d0 ... 0x0f9] = EMIT_MOVEfromSR,
 
@@ -2453,10 +2513,10 @@ static EMIT_Function JumpTable[4096] = {
     [0xac0 ... 0xac7] = EMIT_TAS,
     [0xad0 ... 0xaf9] = EMIT_TAS,
 
-    [0xc00 ... 0xc07] = EMIT_MUL_DIV,
-    [0xc10 ... 0xc3b] = EMIT_MUL_DIV,
-    [0xc40 ... 0xc47] = EMIT_MUL_DIV,
-    [0xc50 ... 0xc7b] = EMIT_MUL_DIV,
+    [0xc00 ... 0xc07] = EMIT_MUL_DIV_,
+    [0xc10 ... 0xc3c] = EMIT_MUL_DIV_,
+    [0xc40 ... 0xc47] = EMIT_MUL_DIV_,
+    [0xc50 ... 0xc7c] = EMIT_MUL_DIV_,
 
     [0x890 ... 0x897] = EMIT_MOVEM,
     [0x8a0 ... 0x8b9] = EMIT_MOVEM,
@@ -2536,7 +2596,7 @@ uint32_t *EMIT_line4(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed
     *insn_consumed = 1;
 
     if (JumpTable[opcode & 0xfff]) {
-        ptr = JumpTable[opcode & 0xfff](ptr, opcode, m68k_ptr);
+        ptr = JumpTable[opcode & 0xfff](ptr, opcode, m68k_ptr, insn_consumed);
     }
     else
     {

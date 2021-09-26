@@ -60,45 +60,55 @@ uint32_t *EMIT_move(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed)
     {
         uint16_t opcode2 = BE16((*m68k_ptr)[1]);
 
-        if ((opcode2 & 0x31f8) == 0x2018 && (opcode & 0x7) == (opcode2 & 0x7))
+        if ((opcode2 & 0xf1f8) == 0x2018 && (opcode & 0x7) == (opcode2 & 0x7))
         {
             uint8_t addr_reg = RA_MapM68kRegisterForWrite(&ptr, (opcode & 7) + 8);
             uint8_t src_reg_1 = RA_MapM68kRegister(&ptr, (opcode & 0x0e00) >> 9);
             uint8_t src_reg_2 = RA_MapM68kRegister(&ptr, (opcode2 & 0x0e00) >> 9);
 
-            /* Two subsequent (An)+ moves to register */
-            (*m68k_ptr)++;
-            update_mask = M68K_GetSRMask(*m68k_ptr);
-            (*m68k_ptr)++;
+            /* Merge only if loads go to two different registers */
+            if (src_reg_1 != src_reg_2)
+            {
+                /* Two subsequent (An)+ moves to register */
+                (*m68k_ptr)++;
+                update_mask = M68K_GetSRMask(*m68k_ptr);
+                (*m68k_ptr)++;
 
-            *ptr++ = ldp_postindex(addr_reg, src_reg_1, src_reg_2, 8);
+                *ptr++ = ldp_postindex(addr_reg, src_reg_1, src_reg_2, 8);
 
-            tmp_reg = src_reg_2;
+                tmp_reg = src_reg_2;
 
-            done = 1;
-            ptr = EMIT_AdvancePC(ptr, 4);
-            *insn_consumed = 2;
+                done = 1;
+                ptr = EMIT_AdvancePC(ptr, 4);
+                *insn_consumed = 2;
+                size = 4;
+            }
         }
-        else if ((opcode2 & 0x31f8) == 0x2020 && (opcode & 0x7) == (opcode2 & 0x7))
+        else if ((opcode2 & 0xf1f8) == 0x2020 && (opcode & 0x7) == (opcode2 & 0x7))
         {
             uint8_t addr_reg = RA_MapM68kRegisterForWrite(&ptr, (opcode & 7) + 8);
             uint8_t src_reg_1 = RA_MapM68kRegister(&ptr, (opcode & 0x0e00) >> 9);
             uint8_t src_reg_2 = RA_MapM68kRegister(&ptr, (opcode2 & 0x0e00) >> 9);
 
-            /* Two subsequent -(An) moves to register */
-            (*m68k_ptr)++;
-            update_mask = M68K_GetSRMask(*m68k_ptr);
-            (*m68k_ptr)++;
+            /* Merge only if loads go to two different registers */
+            if (src_reg_1 != src_reg_2)
+            {
+                /* Two subsequent -(An) moves to register */
+                (*m68k_ptr)++;
+                update_mask = M68K_GetSRMask(*m68k_ptr);
+                (*m68k_ptr)++;
 
-            *ptr++ = ldp_preindex(addr_reg, src_reg_2, src_reg_1, -8);
+                *ptr++ = ldp_preindex(addr_reg, src_reg_2, src_reg_1, -8);
 
-            tmp_reg = src_reg_2;
+                tmp_reg = src_reg_2;
 
-            done = 1;
-            ptr = EMIT_AdvancePC(ptr, 4);
-            *insn_consumed = 2;
+                done = 1;
+                ptr = EMIT_AdvancePC(ptr, 4);
+                *insn_consumed = 2;
+                size = 4;
+            }
         }
-        else if ((opcode2 & 0x31f8) == 0x20c0 && (opcode & 0x7) == (opcode2 & 0x7))
+        else if ((opcode2 & 0xf1f8) == 0x20c0 && (opcode & 0x7) == (opcode2 & 0x7))
         {
             uint8_t addr_reg = RA_MapM68kRegisterForWrite(&ptr, ((opcode >> 9) & 7) + 8);
             uint8_t src_reg_1 = RA_MapM68kRegister(&ptr, opcode & 7);
@@ -116,8 +126,9 @@ uint32_t *EMIT_move(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed)
             done = 1;
             ptr = EMIT_AdvancePC(ptr, 4);
             *insn_consumed = 2;
+            size = 4;
         }
-        else if ((opcode2 & 0x31f8) == 0x2100 && (opcode & 0x0e00) == (opcode2 & 0x0e00))
+        else if ((opcode2 & 0xf1f8) == 0x2100 && (opcode & 0x0e00) == (opcode2 & 0x0e00))
         {
             uint8_t addr_reg = RA_MapM68kRegisterForWrite(&ptr, ((opcode >> 9) & 7) + 8);
             uint8_t src_reg_1 = RA_MapM68kRegister(&ptr, opcode & 7);
@@ -135,6 +146,7 @@ uint32_t *EMIT_move(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed)
             done = 1;
             ptr = EMIT_AdvancePC(ptr, 4);
             *insn_consumed = 2;
+            size = 4;
         }
     }
 
