@@ -65,6 +65,17 @@ static inline void ticksleep(uint64_t ticks)
   } while(t1 < t0);
 }
 
+static inline void ticksleep_wfe(uint64_t ticks)
+{
+  uint64_t t0 = 0, t1 = 0;
+  asm volatile("mrs %0, CNTPCT_EL0":"=r"(t0));
+  t0 += ticks;
+  do {
+    asm volatile("mrs %0, CNTPCT_EL0":"=r"(t1));
+    asm volatile("wfe");
+  } while(t1 < t0);
+}
+
 #define TXD_BIT (1 << 26)
 
 void bitbang_putByte(uint8_t byte)
@@ -426,4 +437,56 @@ void ps_update_irq() {
   }*/
 
   //m68k_set_irq(ipl);
+}
+
+#define PM_RSTC         ((volatile unsigned int*)(0xf2000000 + 0x0010001c))
+#define PM_RSTS         ((volatile unsigned int*)(0xf2000000 + 0x00100020))
+#define PM_WDOG         ((volatile unsigned int*)(0xf2000000 + 0x00100024))
+#define PM_WDOG_MAGIC   0x5a000000
+#define PM_RSTC_FULLRST 0x00000020
+
+volatile int housekeeper_enabled = 0;
+volatile int ipl0 = 0;
+
+void ps_housekeeper() 
+{
+  if (!gpio)
+    gpio = ((volatile unsigned *)BCM2708_PERI_BASE) + GPIO_ADDR / 4;
+
+  kprintf("[HKEEP] Housekeeper activated\n");
+  kprintf("[HKEEP] Please note we are burning the cpu with busyloops now\n");
+
+  /* Configure timer-based event stream */
+  /* Enable timer regs from EL0, enable event stream on posedge, monitor 3th bit */
+  /* This gives a frequency of 1.2MHz for a 19.2MHz timer */
+  asm volatile("msr CNTKCTL_EL1, %0"::"r"(3 | (1 << 2) | (3 << 8) | (3 << 4)));
+
+  for(;;) {
+    if (housekeeper_enabled)
+    {
+      uint32_t pin = LE32(*(gpio + 13));
+      ipl0 = pin & (1 << PIN_IPL_ZERO);
+
+      if ((pin & (1 << PIN_RESET)) == 0) {
+
+        kprintf("[HKEEP] Houskeeper will reset RasPi now...\n");
+
+        unsigned int r;
+        // trigger a restart by instructing the GPU to boot from partition 0
+        r = LE32(*PM_RSTS); r &= ~0xfffffaaa;
+        *PM_RSTS = LE32(PM_WDOG_MAGIC | r);   // boot from partition 0
+        *PM_WDOG = LE32(PM_WDOG_MAGIC | 10);
+        *PM_RSTC = LE32(PM_WDOG_MAGIC | PM_RSTC_FULLRST);
+
+        while(1);
+
+      }
+
+      /*
+        Wait for event. It can happen that the CPU is flooded with them for some reason, but
+        nevertheless, thanks for the event stream set up above, they will appear at 1.2MHz in worst case
+      */
+      asm volatile("wfe");
+    }
+  }
 }
