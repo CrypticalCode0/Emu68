@@ -284,12 +284,22 @@ int SYSWriteValToAddr(uint64_t value, int size, uint64_t far)
 {
     D(kprintf("[JIT:SYS] SYSWriteValToAddr(0x%x, %d, %p)\n", value, size, far));
 
+    /*
+        Allow single wrap around the address space. This provides mirror areas for
+        simplified aarch64 pointer arithmetic
+    */
+    if ((far >> 32) == 1 || (far >> 32) == 0xffffffff) {
+        far &= 0xffffffff;
+    }
+
+    if (far == 0xdeadbeef && size == 1) {
+        kprintf("%c", value);
+        return 1;
+    }
+
     if (far >= 0xff000000) {
         kprintf("Z3 write access with far %08x\n", far);
     }
-
-    if (size > 1 && (far & 1))
-        kprintf("UNALIGNED WORD/LONG write to %08x\n");
 
     if (far > (0x1000000ULL - size)) {
         kprintf("Illegal FAR %08x\n", far);
@@ -354,8 +364,13 @@ int SYSReadValFromAddr(uint64_t *value, int size, uint64_t far)
 
     uint64_t a, b;
 
-    if (size > 1 && (far & 1))
-        kprintf("UNALIGNED WORD/LONG read from %08x\n", far);
+    /*
+        Allow single wrap around the address space. This provides mirror areas for
+        simplified aarch64 pointer arithmetic
+    */
+    if ((far >> 32) == 1 || (far >> 32) == 0xffffffff) {
+        far &= 0xffffffff;
+    }
 
     if (far > (0x1000000ULL - size)) {
      //   kprintf("Illegal FAR %08x\n", far);
@@ -363,9 +378,14 @@ int SYSReadValFromAddr(uint64_t *value, int size, uint64_t far)
     }
 
     if (far >= 0xe80000 && far <= 0xe8ffff && size == 1)
-    {       
+    {
+        while(board[board_idx] && !board[board_idx]->enabled) {
+            board_idx++;
+        }
+
         if (board[board_idx])
         {
+            
             const uint8_t *rom = board[board_idx]->rom_file;
             *value = rom[far - 0xe80000];
 

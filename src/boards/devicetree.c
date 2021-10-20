@@ -3,7 +3,15 @@
 #include <A64.h>
 #include <devicetree.h>
 #include <support.h>
+
+__attribute__((aligned(4096)))
 #include "./devicetree.h"
+
+/*
+    This is a Z3 ROM board with device tree resource. It provides userspace to read the keys and properties from
+    the tree in order to e.g. find the available peripherals. The board is provided with its own m68k ROM with the
+    resource inside. No ARM-side code is used in this board.
+*/
 
 static void map(struct ExpansionBoard *board)
 {
@@ -16,6 +24,7 @@ static struct ExpansionBoard board = {
     devicetree_bin,
     4096,
     0,
+    1,
     1,
     map
 };

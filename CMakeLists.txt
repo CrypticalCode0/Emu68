@@ -100,6 +100,8 @@ if (${VARIANT} IN_LIST SUPPORTED_VARIANTS)
                 src/pistorm/ps_protocol.c
                 src/boards/devicetree.c
                 src/boards/z2ram.c
+                src/boards/sdcard.c
+                src/boards/68040.c
             )
         else()
             message(FATAL_ERROR "PiStorm variant is supported on raspi targets, only.")

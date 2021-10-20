@@ -222,7 +222,7 @@ static uint32_t *EMIT_ROXL_mem(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_p
 {
     uint8_t update_mask = M68K_GetSRMask(&(*m68k_ptr)[-1]);
     (void)update_mask;
-    ptr = EMIT_InjectDebugString(ptr, "[JIT] ROXL/ROXR at %08x not implemented\n", *m68k_ptr - 1);
+    ptr = EMIT_InjectDebugString(ptr, "[JIT] ROXL/ROXR mem mode at %08x not implemented\n", *m68k_ptr - 1);
     ptr = EMIT_InjectPrintContext(ptr);
     *ptr++ = udf(opcode);
     return ptr;
@@ -390,7 +390,7 @@ static uint32_t *EMIT_ASL(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                     *ptr++ = sxtw64(tmp, reg);
                     if (update_mask & (SR_C | SR_X))
                     {
-                        *ptr++ = ands_reg(31, tmp, mask, LSL, 0);
+                        *ptr++ = ands64_reg(31, tmp, mask, LSL, 0);
                     }
                     *ptr++ = asrv64(tmp, tmp, shiftreg);
                     *ptr++ = mov_reg(reg, tmp);
@@ -403,7 +403,7 @@ static uint32_t *EMIT_ASL(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                     *ptr++ = sxth64(tmp, reg);
                     if (update_mask & (SR_C | SR_X))
                     {
-                        *ptr++ = ands_reg(31, tmp, mask, LSL, 0);
+                        *ptr++ = ands64_reg(31, tmp, mask, LSL, 0);
                     }
                     *ptr++ = asrv64(tmp, tmp, shiftreg);
 #else
@@ -417,7 +417,7 @@ static uint32_t *EMIT_ASL(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                     *ptr++ = sxtb64(tmp, reg);
                     if (update_mask & (SR_C | SR_X))
                     {
-                        *ptr++ = ands_reg(31, tmp, mask, LSL, 0);
+                        *ptr++ = ands64_reg(31, tmp, mask, LSL, 0);
                     }
                     *ptr++ = asrv64(tmp, tmp, shiftreg);
 #else
@@ -2263,9 +2263,10 @@ uint32_t *EMIT_lineE(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed
     }
     else
     {
+        ptr = EMIT_FlushPC(ptr);
         ptr = EMIT_InjectDebugString(ptr, "[JIT] opcode %04x at %08x not implemented\n", opcode, *m68k_ptr - 1);
-        ptr = EMIT_InjectPrintContext(ptr);
-        *ptr++ = udf(opcode);
+        ptr = EMIT_Exception(ptr, VECTOR_ILLEGAL_INSTRUCTION, 0);
+        *ptr++ = INSN_TO_LE(0xffffffff);
     }
 
     return ptr;
