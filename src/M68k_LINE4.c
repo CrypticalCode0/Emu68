@@ -529,7 +529,6 @@ uint32_t *EMIT_NEGX(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_
             break;
     }
 
-    /* handle clearing D register here */
     if ((opcode & 0x0038) == 0)
     {
         if (size == 4)
@@ -828,7 +827,7 @@ uint32_t *EMIT_TAS(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_t
 
         *ptr++ = mov_reg(tmpresult, dest);
 #ifdef __aarch64__
-        *ptr++ = orr_immed(dest, dest, 1, 24);
+        *ptr++ = orr_immed(dest, dest, 1, 25);
 #else
         *ptr++ = orr_immed(dest, dest, 0x80);
 #endif
@@ -848,7 +847,7 @@ uint32_t *EMIT_TAS(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_t
         }
 #ifdef __aarch64__
         *ptr++ = ldxrb(dest, tmpresult);
-        *ptr++ = orr_immed(tmpreg, tmpresult, 1, 24);
+        *ptr++ = orr_immed(tmpreg, tmpresult, 1, 25);
         *ptr++ = stxrb(dest, tmpreg, tmpstate);
         *ptr++ = cmp_reg(31, tmpstate, LSL, 0);
         *ptr++ = b_cc(A64_CC_NE, -4);
@@ -1168,11 +1167,11 @@ static uint32_t *EMIT_LINK32(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr
     uint8_t sp;
     uint8_t displ;
     uint8_t reg;
-    int8_t pc_off;
+    int32_t offset = (BE16((*m68k_ptr)[0]) << 16) | BE16((*m68k_ptr)[1]);
+
     displ = RA_AllocARMRegister(&ptr);
-    pc_off = 2;
-    ptr = EMIT_GetOffsetPC(ptr, &pc_off);
-    *ptr++ = ldr_offset(REG_PC, displ, pc_off);
+    *ptr++ = movw_immed_u16(displ, offset & 0xffff);
+    *ptr++ = movt_immed_u16(displ, (offset >> 16) & 0xffff);
     sp = RA_MapM68kRegister(&ptr, 15);
     reg = RA_MapM68kRegister(&ptr, 8 + (opcode & 7));
     *ptr++ = str_offset_preindex(sp, reg, -4);  /* SP = SP - 4; An -> (SP) */
@@ -1272,10 +1271,25 @@ static uint32_t *EMIT_ILLEGAL(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_pt
 {
     (void)insn_consumed;
     (void)opcode;
+    (void)m68k_ptr;
 
     /* Illegal generates exception. Always */
     ptr = EMIT_FlushPC(ptr);
-    ptr = EMIT_InjectDebugString(ptr, "[JIT] ILLEGAL opcode at %08x\n", *m68k_ptr - 1);
+    ptr = EMIT_Exception(ptr, VECTOR_ILLEGAL_INSTRUCTION, 0);
+    *ptr++ = INSN_TO_LE(0xffffffff);
+
+    return ptr;
+}
+
+static uint32_t *EMIT_BKPT(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_t *insn_consumed)
+{
+    (void)insn_consumed;
+    (void)opcode;
+    (void)m68k_ptr;
+
+    /* Illegal generates exception. Always */
+    ptr = EMIT_AdvancePC(ptr, 2);
+    ptr = EMIT_FlushPC(ptr);
     ptr = EMIT_Exception(ptr, VECTOR_ILLEGAL_INSTRUCTION, 0);
     *ptr++ = INSN_TO_LE(0xffffffff);
 
@@ -1652,7 +1666,28 @@ static uint32_t *EMIT_RTS(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, u
     uint16_t *ret_addr = M68K_PopReturnAddress(NULL);
     if (ret_addr != (uint16_t *)0xffffffff)
     {
+        /* 
+            If return stack is used, make sure that the code below is at the address we were expecting
+            This must not be the case - it would be sufficient if code has modified the return address on the stack
+        */
+        uint8_t reg = RA_AllocARMRegister(&ptr);
+        uint32_t *tmp;
+        *ptr++ = ldr_pcrel(reg, 4);
+        *ptr++ = cmp_reg(reg, REG_PC, LSL, 0);
+        tmp = ptr;
+        *ptr++ = b_cc(ARM_CC_EQ, 0);
+        *ptr++ = b(2);
+        *ptr++ = (uint32_t)(uintptr_t)ret_addr;
+
         *m68k_ptr = ret_addr;
+
+        RA_FreeARMRegister(&ptr, reg);
+
+        *tmp = b_cc(ARM_CC_EQ, ptr - tmp);
+        *ptr++ = (uint32_t)(uintptr_t)tmp;
+        *ptr++ = 1;
+        *ptr++ = 0;
+        *ptr++ = INSN_TO_LE(0xfffffffe);
     }
     else
         *ptr++ = INSN_TO_LE(0xffffffff);
@@ -1744,20 +1779,32 @@ static uint32_t *EMIT_MOVEC(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr,
     {
         switch (opcode2 & 0xfff)
         {
-            case 0x800:
+            case 0x000: // SFC
+                tmp = RA_AllocARMRegister(&ptr);
+                *ptr++ = and_immed(tmp, reg, 3, 0);
+                *ptr++ = strb_offset(ctx, tmp, __builtin_offsetof(struct M68KState, SFC));
+                RA_FreeARMRegister(&ptr, tmp);
+                break;
+            case 0x001: // DFC
+                tmp = RA_AllocARMRegister(&ptr);
+                *ptr++ = and_immed(tmp, reg, 3, 0);
+                *ptr++ = strb_offset(ctx, tmp, __builtin_offsetof(struct M68KState, DFC));
+                RA_FreeARMRegister(&ptr, tmp);
+                break;
+            case 0x800: // USP
                 *ptr++ = str_offset(ctx, reg, __builtin_offsetof(struct M68KState, USP));
                 break;
-            case 0x801:
+            case 0x801: // VBR
                 *ptr++ = str_offset(ctx, reg, __builtin_offsetof(struct M68KState, VBR));
                 break;
-            case 0x002:
+            case 0x002: // CACR
                 tmp = RA_AllocARMRegister(&ptr);
                 *ptr++ = bic_immed(tmp, reg, 15, 0);
                 *ptr++ = bic_immed(tmp, tmp, 15, 16);
                 *ptr++ = str_offset(ctx, tmp, __builtin_offsetof(struct M68KState, CACR));
                 RA_FreeARMRegister(&ptr, tmp);
                 break;
-            case 0x803:
+            case 0x803: // MSP
                 sp = RA_MapM68kRegister(&ptr, 15);
                 RA_SetDirtyM68kRegister(&ptr, 15);
                 *ptr++ = tst_immed(cc, 1, 32 - SRB_M);
@@ -1765,7 +1812,7 @@ static uint32_t *EMIT_MOVEC(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr,
                 *ptr++ = mov_reg(sp, reg);
                 *ptr++ = str_offset(ctx, reg, __builtin_offsetof(struct M68KState, MSP));
                 break;
-            case 0x804:
+            case 0x804: // ISP
                 sp = RA_MapM68kRegister(&ptr, 15);
                 RA_SetDirtyM68kRegister(&ptr, 15);
                 *ptr++ = tst_immed(cc, 1, 32 - SRB_M);
@@ -1773,22 +1820,81 @@ static uint32_t *EMIT_MOVEC(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr,
                 *ptr++ = mov_reg(sp, reg);
                 *ptr++ = str_offset(ctx, reg, __builtin_offsetof(struct M68KState, ISP));                    
                 break;
+            case 0x003: // TCR - write bits 15, 14, read all zeros for now
+                tmp = RA_AllocARMRegister(&ptr);
+                *ptr++ = bic_immed(tmp, reg, 30, 32 - 14);
+                *ptr++ = strh_offset(ctx, tmp, __builtin_offsetof(struct M68KState, TCR));
+                RA_FreeARMRegister(&ptr, tmp);
+                break;
+            case 0x004: // ITT0
+                tmp = RA_AllocARMRegister(&ptr);
+                *ptr++ = movn_immed_u16(tmp, 0x1c9b, 0);
+                *ptr++ = and_reg(tmp, tmp, reg, LSL, 0);
+                *ptr++ = str_offset(ctx, tmp, __builtin_offsetof(struct M68KState, ITT0));
+                RA_FreeARMRegister(&ptr, tmp);
+                break;
+            case 0x005: // ITT1
+                tmp = RA_AllocARMRegister(&ptr);
+                *ptr++ = movn_immed_u16(tmp, 0x1c9b, 0);
+                *ptr++ = and_reg(tmp, tmp, reg, LSL, 0);
+                *ptr++ = str_offset(ctx, tmp, __builtin_offsetof(struct M68KState, ITT1));
+                RA_FreeARMRegister(&ptr, tmp);
+                break;
+            case 0x006: // DTT0
+                tmp = RA_AllocARMRegister(&ptr);
+                *ptr++ = movn_immed_u16(tmp, 0x1c9b, 0);
+                *ptr++ = and_reg(tmp, tmp, reg, LSL, 0);
+                *ptr++ = str_offset(ctx, tmp, __builtin_offsetof(struct M68KState, DTT0));
+                RA_FreeARMRegister(&ptr, tmp);
+                break;
+            case 0x007: // DTT1
+                tmp = RA_AllocARMRegister(&ptr);
+                *ptr++ = movn_immed_u16(tmp, 0x1c9b, 0);
+                *ptr++ = and_reg(tmp, tmp, reg, LSL, 0);
+                *ptr++ = str_offset(ctx, tmp, __builtin_offsetof(struct M68KState, DTT1));
+                RA_FreeARMRegister(&ptr, tmp);
+                break;
+            case 0x805: // MMUSR
+                *ptr++ = str_offset(ctx, reg, __builtin_offsetof(struct M68KState, MMUSR));
+                break;
+            case 0x806: // URP
+                tmp = RA_AllocARMRegister(&ptr);
+                *ptr++ = bic_immed(tmp, reg, 9, 0);
+                *ptr++ = str_offset(ctx, tmp, __builtin_offsetof(struct M68KState, URP));
+                RA_FreeARMRegister(&ptr, tmp);
+                break;
+            case 0x807: // SRP
+                tmp = RA_AllocARMRegister(&ptr);
+                *ptr++ = bic_immed(tmp, reg, 9, 0);
+                *ptr++ = str_offset(ctx, tmp, __builtin_offsetof(struct M68KState, SRP));
+                RA_FreeARMRegister(&ptr, tmp);
+                break;
+            default:
+                ptr = EMIT_Exception(ptr, VECTOR_ILLEGAL_INSTRUCTION, 0);
+                *ptr++ = sub_immed(REG_PC, REG_PC, 4);
+                break;
         }
     }
     else
     {
         switch (opcode2 & 0xfff)
         {
-            case 0x800:
+            case 0x000: // SFC
+                *ptr++ = ldrb_offset(ctx, reg, __builtin_offsetof(struct M68KState, SFC));
+                break;
+            case 0x001: // DFC
+                *ptr++ = ldrb_offset(ctx, reg, __builtin_offsetof(struct M68KState, SFC));
+                break;
+            case 0x800: // USP
                 *ptr++ = ldr_offset(ctx, reg, __builtin_offsetof(struct M68KState, USP));
                 break;
-            case 0x801:
+            case 0x801: // VBR
                 *ptr++ = ldr_offset(ctx, reg, __builtin_offsetof(struct M68KState, VBR));
                 break;
-            case 0x002:
+            case 0x002: // CACR
                 *ptr++ = ldr_offset(ctx, reg, __builtin_offsetof(struct M68KState, CACR));
                 break;
-            case 0x803:
+            case 0x803: // MSP
                 sp = RA_MapM68kRegister(&ptr, 15);
                 tmp = RA_AllocARMRegister(&ptr);
                 *ptr++ = tst_immed(cc, 1, 32 - SRB_M);
@@ -1796,7 +1902,7 @@ static uint32_t *EMIT_MOVEC(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr,
                 *ptr++ = csel(reg, sp, tmp, A64_CC_NE);
                 RA_FreeARMRegister(&ptr, tmp);
                 break;
-            case 0x804:
+            case 0x804: // ISP
                 sp = RA_MapM68kRegister(&ptr, 15);
                 tmp = RA_AllocARMRegister(&ptr);
                 *ptr++ = tst_immed(cc, 1, 32 - SRB_M);
@@ -1804,22 +1910,22 @@ static uint32_t *EMIT_MOVEC(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr,
                 *ptr++ = csel(reg, sp, tmp, A64_CC_EQ);
                 RA_FreeARMRegister(&ptr, tmp);
                 break;
-            case 0xc00:
+            case 0x0e0: /* CNTFRQ - speed of counter clock in Hz */
                 *ptr++ = mrs(reg, 3, 3, 14, 0, 0);
                 break;
-            case 0xc01:
+            case 0x0e1: /* CNTVALLO - lower 32 bits of the counter */
                 tmp = RA_AllocARMRegister(&ptr);
                 *ptr++ = mrs(tmp, 3, 3, 14, 0, 1);
                 *ptr++ = mov_reg(reg, tmp);
                 RA_FreeARMRegister(&ptr, tmp);
                 break;
-            case 0xc02:
+            case 0x0e2: /* CNTVALHI - higher 32 bits of the counter */
                 tmp = RA_AllocARMRegister(&ptr);
                 *ptr++ = mrs(tmp, 3, 3, 14, 0, 1);
                 *ptr++ = lsr64(reg, tmp, 32);
                 RA_FreeARMRegister(&ptr, tmp);
                 break;
-            case 0xc03:
+            case 0x0e3: /* INSNCNTLO - lower 32 bits of m68k instruction counter */
                 tmp = RA_AllocARMRegister(&ptr);
                 *ptr++ = ldr64_offset(ctx, tmp, __builtin_offsetof(struct M68KState, INSN_COUNT));
                 *ptr++ = add64_immed(tmp, tmp, insn_count & 0xfff);
@@ -1828,7 +1934,7 @@ static uint32_t *EMIT_MOVEC(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr,
                 *ptr++ = mov_reg(reg, tmp);
                 RA_FreeARMRegister(&ptr, tmp);
                 break;
-            case 0xc04:
+            case 0x0e4: /* INSNCNTHI - higher 32 bits of m68k instruction counter */
                 tmp = RA_AllocARMRegister(&ptr);
                 *ptr++ = ldr64_offset(ctx, tmp, __builtin_offsetof(struct M68KState, INSN_COUNT));
                 *ptr++ = add64_immed(tmp, tmp, insn_count & 0xfff);
@@ -1837,17 +1943,49 @@ static uint32_t *EMIT_MOVEC(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr,
                 *ptr++ = lsr64(reg, tmp, 32);
                 RA_FreeARMRegister(&ptr, tmp);
                 break;
-            case 0xc05:
+            case 0x0e5: /* ARMCNTLO - lower 32 bits of ARM instruction counter */
                 tmp = RA_AllocARMRegister(&ptr);
                 *ptr++ = mrs(tmp, 3, 3, 9, 13, 0);
                 *ptr++ = mov_reg(reg, tmp);
                 RA_FreeARMRegister(&ptr, tmp);
                 break;
-            case 0xc06:
+            case 0x0e6: /* ARMCNTHI - higher 32 bits of ARM instruction counter */
                 tmp = RA_AllocARMRegister(&ptr);
                 *ptr++ = mrs(tmp, 3, 3, 9, 13, 0);
                 *ptr++ = lsr64(reg, tmp, 32);
                 RA_FreeARMRegister(&ptr, tmp);
+                break;
+            case 0x003: // TCR - write bits 15, 14, read all zeros for now
+                tmp = RA_AllocARMRegister(&ptr);
+                *ptr++ = ldrh_offset(ctx, tmp, __builtin_offsetof(struct M68KState, TCR));
+                *ptr++ = mov_immed_u16(tmp, 0, 0); // Temporary hack - no MMU!!!
+                *ptr++ = bfi(reg, tmp, 0, 16); // TCR is read/written as 16 bit register!
+                RA_FreeARMRegister(&ptr, tmp);
+                break;
+            case 0x004: // ITT0
+                *ptr++ = ldr_offset(ctx, reg, __builtin_offsetof(struct M68KState, ITT0));
+                break;
+            case 0x005: // ITT1
+                *ptr++ = ldr_offset(ctx, reg, __builtin_offsetof(struct M68KState, ITT1));
+                break;
+            case 0x006: // DTT0
+                *ptr++ = ldr_offset(ctx, reg, __builtin_offsetof(struct M68KState, DTT0));
+                break;
+            case 0x007: // DTT1
+                *ptr++ = ldr_offset(ctx, reg, __builtin_offsetof(struct M68KState, DTT1));
+                break;
+            case 0x805: // MMUSR
+                *ptr++ = ldr_offset(ctx, reg, __builtin_offsetof(struct M68KState, MMUSR));
+                break;
+            case 0x806: // URP
+                *ptr++ = ldr_offset(ctx, reg, __builtin_offsetof(struct M68KState, URP));
+                break;
+            case 0x807: // SRP
+                *ptr++ = ldr_offset(ctx, reg, __builtin_offsetof(struct M68KState, SRP));
+                break;
+            default:
+                ptr = EMIT_Exception(ptr, VECTOR_ILLEGAL_INSTRUCTION, 0);
+                *ptr++ = sub_immed(REG_PC, REG_PC, 4);
                 break;
         }
         RA_SetDirtyM68kRegister(&ptr, opcode2 >> 12);
@@ -2102,6 +2240,8 @@ static uint32_t *EMIT_MOVEM(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr,
 
     (*m68k_ptr)++;
 
+    ptr = EMIT_AdvancePC(ptr, 2);
+
     for (int i=0; i < 16; i++)
     {
         if (mask & (1 << i))
@@ -2321,7 +2461,7 @@ static uint32_t *EMIT_MOVEM(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr,
         RA_FreeARMRegister(&ptr, base);
     }
 
-    ptr = EMIT_AdvancePC(ptr, 2*(ext_words + 2));
+    ptr = EMIT_AdvancePC(ptr, 2*(ext_words + 1));
     (*m68k_ptr) += ext_words;
 
     return ptr;
@@ -2459,7 +2599,7 @@ static EMIT_MultiFunction JumpTable[4096] = {
     [0xe77]           = EMIT_RTR,
     [0xe7a ... 0xe7b] = EMIT_MOVEC,
     [0xe60 ... 0xe6f] = EMIT_MOVEUSP,
-    [0x848 ... 0x84f] = NULL,           // BKPT
+    [0x848 ... 0x84f] = EMIT_BKPT,      // BKPT
     [0xafa]           = NULL,           // BGND
 
     [0xed0 ... 0xed7] = EMIT_JMP,
@@ -2489,20 +2629,20 @@ static EMIT_MultiFunction JumpTable[4096] = {
     [0x480 ... 0x487] = EMIT_NEG,
     
     [0x410 ... 0x439] = EMIT_NEG,
-    [0x450 ... 0x477] = EMIT_NEG,
-    [0x490 ... 0x4b7] = EMIT_NEG,
+    [0x450 ... 0x479] = EMIT_NEG,
+    [0x490 ... 0x4b9] = EMIT_NEG,
 
     [0x600 ... 0x607] = EMIT_NOT,
     [0x640 ... 0x647] = EMIT_NOT,
     [0x680 ... 0x687] = EMIT_NOT,
     
     [0x610 ... 0x639] = EMIT_NOT,
-    [0x650 ... 0x677] = EMIT_NOT,
-    [0x690 ... 0x6b7] = EMIT_NOT,
+    [0x650 ... 0x679] = EMIT_NOT,
+    [0x690 ... 0x6b9] = EMIT_NOT,
 
-    [0xa00 ... 0xa3b] = EMIT_TST,
-    [0xa40 ... 0xa7b] = EMIT_TST,
-    [0xa80 ... 0xabb] = EMIT_TST,
+    [0xa00 ... 0xa3c] = EMIT_TST,
+    [0xa40 ... 0xa7c] = EMIT_TST,
+    [0xa80 ... 0xabc] = EMIT_TST,
 
     [0x800 ... 0x807] = EMIT_NBCD,
     [0x810 ... 0x839] = EMIT_NBCD,
@@ -2600,9 +2740,10 @@ uint32_t *EMIT_line4(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed
     }
     else
     {
+        ptr = EMIT_FlushPC(ptr);
         ptr = EMIT_InjectDebugString(ptr, "[JIT] opcode %04x at %08x not implemented\n", opcode, *m68k_ptr - 1);
-        ptr = EMIT_InjectPrintContext(ptr);
-        *ptr++ = udf(opcode);
+        ptr = EMIT_Exception(ptr, VECTOR_ILLEGAL_INSTRUCTION, 0);
+        *ptr++ = INSN_TO_LE(0xffffffff);
     }
 
     return ptr;
@@ -2612,11 +2753,7 @@ uint32_t *EMIT_line4(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed
 void do_reset()
 {
     void ps_pulse_reset();
-    extern uint32_t overlay;
-    extern uint32_t z2_ram_autoconf;
 
     ps_pulse_reset();
-    overlay = 1;
-    z2_ram_autoconf = 1;
 }
 #endif

@@ -155,8 +155,21 @@ struct M68KState
 		};
     } FP[8];   // Double precision! Extended is "emulated" in load/store only
 
+    /* More control registers.. */
+    uint8_t  SFC;
+    uint8_t  DFC;
+    uint16_t TCR;
+    uint32_t URP;
+    uint32_t SRP;
+    uint32_t MMUSR;
+    uint32_t ITT0;
+    uint32_t ITT1;
+    uint32_t DTT0;
+    uint32_t DTT1;
+
     /* Async IRQ part */
     uint32_t PINT;
+    uint32_t IPL0;
     uint64_t INSN_COUNT;
 };
 

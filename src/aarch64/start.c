@@ -731,6 +731,14 @@ void boot(void *dtree)
 
     platform_post_init();
 
+    extern void (*__init_start)();
+    void (**InitFunctions)() = &__init_start;
+    while(*InitFunctions)
+    {
+        (*InitFunctions)();
+        InitFunctions++;
+    }
+
 #ifndef PISTORM
     if (initramfs_loc != NULL && initramfs_size != 0)
     {
@@ -862,6 +870,19 @@ void boot(void *dtree)
         else
         {
             DuffCopy((void*)0xffffff9000f80000, initramfs_loc, 524288 / 4);
+        }
+
+        /* Check if ROM is byte-swapped */
+        {
+            uint8_t *rom_start = (uint8_t *)0xffffff9000f80000;
+            if (rom_start[2] == 0xf9 && rom_start[3] == 0x4e) {
+                kprintf("[BOOT] Byte-swapped ROM detected. Fixing...\n");
+                for (int i=0; i < 524288; i+=2) {
+                    uint8_t tmp = rom_start[i];
+                    rom_start[i] = rom_start[i + 1];
+                    rom_start[i+1] = tmp;
+                }
+            }
         }
 
         rom_mapped = 1;
@@ -1068,6 +1089,7 @@ struct M68KTranslationUnit *_FindUnit(uint16_t *ptr)
 void  __attribute__((used)) stub_FindUnit()
 {
     asm volatile(
+"       .align  5                           \n"
 "FindUnit:                                  \n"
 "       adrp    x4, ICache                  \n"
 "       add     x4, x4, :lo12:ICache        \n"
@@ -1100,7 +1122,6 @@ void  __attribute__((used)) stub_FindUnit()
 }
 
 uint32_t last_pc;
-extern volatile int ipl0;
 
 void  __attribute__((used)) stub_ExecutionLoop()
 {
@@ -1113,24 +1134,21 @@ void  __attribute__((used)) stub_ExecutionLoop()
 "       stp     x21, x22, [sp, #4*16]       \n"
 "       stp     x19, x20, [sp, #5*16]       \n"
 "       bl      M68K_LoadContext            \n"
-"       .align 4                            \n"
+"       .align 6                            \n"
 "1:                                         \n"
 "       mrs     x0, TPIDRRO_EL0             \n"
 "       mrs     x2, TPIDR_EL1               \n"
+#ifndef PISTORM
 "       cbz     w%[reg_pc], 4f              \n"
+#endif
 
 "       adrp    x1, last_pc                 \n"
 "       add     x1, x1, :lo12:last_pc       \n"
 "       str     w18, [x1]                   \n"
 
-
 #ifdef PISTORM
-"       adrp    x1, ipl0                    \n"
-"       ldr     w1, [x1, :lo12:ipl0]        \n"
+"       ldr     w1, [x0, #%[ipl0]]          \n" // Load ipl0 flag from context
 "       cbz     w1, 9f                      \n"
-//"       mov     x1, #0xf2200000             \n" // Read IPL0 flag from GPIO
-//"       ldr     w1, [x1, 0x34]              \n"
-//"       tbz     w1, #25, 9f                 \n" // If IPL0 flag is not set, go to interrupt handling
 #else
 "       ldr     w1, [x0, #%[pint]]          \n" // Load pending interrupt flag
 "       cbnz    w1, 9f                      \n" // Change context if interrupt was pending
@@ -1367,6 +1385,7 @@ void  __attribute__((used)) stub_ExecutionLoop()
  [diff]"i"(__builtin_offsetof(struct M68KTranslationUnit, mt_ARMCode) - 
         __builtin_offsetof(struct M68KTranslationUnit, mt_UseCount)),
  [pint]"i"(__builtin_offsetof(struct M68KState, PINT)),
+ [ipl0]"i"(__builtin_offsetof(struct M68KState, IPL0)),
  [sr]"i"(__builtin_offsetof(struct M68KState, SR)),
  [usp]"i"(__builtin_offsetof(struct M68KState, USP)),
  [isp]"i"(__builtin_offsetof(struct M68KState, ISP)),
