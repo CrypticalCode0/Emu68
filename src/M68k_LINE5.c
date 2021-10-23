@@ -746,8 +746,8 @@ uint32_t *EMIT_line5(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed
     (*m68k_ptr)++;
     *insn_consumed = 1;
 
-    if (JumpTable[opcode & 0777]) {
-        ptr = JumpTable[opcode & 0777](ptr, opcode, m68k_ptr);
+    if (JumpTable[opcode & 00777]) {
+        ptr = JumpTable[opcode & 00777](ptr, opcode, m68k_ptr);
     }
     else
     {
