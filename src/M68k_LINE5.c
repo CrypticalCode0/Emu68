@@ -725,7 +725,7 @@ static EMIT_Function JumpTable[512] = {
 	[0200 ... 0271] = EMIT_ADDQ,
 
 	[0300 ... 0307] = EMIT_Scc,
-	[0710 ... 0717] = EMIT_DBcc,
+	[0310 ... 0317] = EMIT_DBcc,
 	[0320 ... 0371] = EMIT_Scc,
 	[0372 ... 0374] = EMIT_TRAPcc,
 
@@ -735,7 +735,7 @@ static EMIT_Function JumpTable[512] = {
 	[0600 ... 0671] = EMIT_SUBQ,
 
 	[0700 ... 0707] = EMIT_Scc,
-	[0310 ... 0317] = EMIT_DBcc,
+	[0710 ... 0717] = EMIT_DBcc,
 	[0720 ... 0771] = EMIT_Scc,
 	[0772 ... 0774] = EMIT_TRAPcc,
 }
