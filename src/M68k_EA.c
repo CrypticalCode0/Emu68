@@ -32,7 +32,7 @@ static inline __attribute__((always_inline)) uint32_t * load_reg_from_addr_offse
         base = RA_AllocARMRegister(&ptr);
         *ptr++ = mov_reg(base, 31);
     }
-    switch (size){
+    switch (size) {
         case 4:
             if (offset == 0)
                 *ptr++ = ldr_offset(base, reg, 0);
@@ -424,7 +424,6 @@ static inline __attribute__((always_inline)) uint32_t * store_reg_to_addr(uint32
         base = RA_AllocARMRegister(&ptr);
         *ptr++ = mov_reg(base, 31);
     }
-
     if (index == 0xff) {
         switch (size) {
             case 4:
@@ -447,7 +446,7 @@ static inline __attribute__((always_inline)) uint32_t * store_reg_to_addr(uint32
     else {
 
         uint8_t tmp = RA_AllocARMRegister(&ptr);
-        switch (size){
+        switch (size) {
             case 4:
                 *ptr++ = add_reg(tmp, base, index, LSL, shift);
                 *ptr++ = str_offset(tmp, reg, 0);
@@ -514,16 +513,15 @@ uint32_t *EMIT_LoadFromEffectiveAddress(uint32_t *ptr, uint8_t size, uint8_t *ar
     uint8_t mode = ea >> 3;
     uint8_t src_reg = ea & 7;
 
-    if (size & 0x80){
+    if (size & 0x80) {
         sign_ext = 1;
         size &= 0x7f;
     }
-
     if (imm_offset)
         *imm_offset = 0;
 
     if (mode == 0) { /* Mode 000: Dn */
-        switch (size){
+        switch (size) {
             case 4:
                 if (read_only)
                     *arm_reg = RA_MapM68kRegister(&ptr, src_reg);
@@ -764,7 +762,6 @@ uint32_t *EMIT_LoadFromEffectiveAddress(uint32_t *ptr, uint8_t size, uint8_t *ar
                 else {
                     //*ptr++ = mov_reg(tmp1, reg_An);
                 }
-
                 if (brief & (1 << 11)) {
                     if (brief & 0x8000)
                         tmp2 = RA_MapM68kRegister(&ptr, 8 + extra_reg); // RA_CopyFromM68kRegister(&ptr, 8 + extra_reg);
@@ -802,7 +799,6 @@ uint32_t *EMIT_LoadFromEffectiveAddress(uint32_t *ptr, uint8_t size, uint8_t *ar
                     /* Base register in use. Alloc it and load its contents */
                     base_reg = RA_MapM68kRegister(&ptr, 8 + src_reg);
                 }
-
                 /* Check if index register is in use */
                 if (!(brief & M68K_EA_IS)) {
                     /* Index register in use. Alloc it and load its contents */
@@ -844,7 +840,6 @@ uint32_t *EMIT_LoadFromEffectiveAddress(uint32_t *ptr, uint8_t size, uint8_t *ar
                             *ptr++ = movt_immed_u16(bd_reg, hi16);
                         break;
                 }
-
                 /* Check if outer displacement needs to be fetched */
                 switch ((brief & M68K_EA_IIS) & 3) {
                     case 2: /* Word outer displacement */
@@ -861,7 +856,6 @@ uint32_t *EMIT_LoadFromEffectiveAddress(uint32_t *ptr, uint8_t size, uint8_t *ar
                             *ptr++ = movt_immed_u16(outer_reg, hi16);
                         break;
                 }
-
                 if ((brief & 0x0f) == 0) {
                     /* Address register indirect with index mode */
                     if (base_reg != 0xff && bd_reg != 0xff)
@@ -883,7 +877,6 @@ uint32_t *EMIT_LoadFromEffectiveAddress(uint32_t *ptr, uint8_t size, uint8_t *ar
                             *ptr++ = mov_reg(bd_reg, base_reg);
                         base_reg = 0xff;
                     }
-
                     /* Postindexed mode */
                     if (brief & 0x04) {
                         /* Fetch data from base reg */
@@ -1008,7 +1001,6 @@ uint32_t *EMIT_LoadFromEffectiveAddress(uint32_t *ptr, uint8_t size, uint8_t *ar
                         else
                             *ptr++ = sub_immed(base_reg, REG_PC, -off);
                     }
-
                     /* Check if index register is in use */
                     if (!(brief & M68K_EA_IS)) {
                         /* Index register in use. Alloc it and load its contents */
@@ -1070,7 +1062,6 @@ uint32_t *EMIT_LoadFromEffectiveAddress(uint32_t *ptr, uint8_t size, uint8_t *ar
                             (*ext_words) += 2;
                             break;
                     }
-
                     if ((brief & 0x0f) == 0) {
                         /* Address register indirect with index mode */
                         if (base_reg != 0xff && bd_reg != 0xff) {
@@ -1093,7 +1084,6 @@ uint32_t *EMIT_LoadFromEffectiveAddress(uint32_t *ptr, uint8_t size, uint8_t *ar
                             RA_FreeARMRegister(&ptr, base_reg);
                             base_reg = 0xff;
                         }
-
                         /* Postindexed mode */
                         if (brief & 0x04) {
                             /* Fetch data from base reg */
@@ -1256,7 +1246,6 @@ uint32_t *EMIT_LoadFromEffectiveAddress(uint32_t *ptr, uint8_t size, uint8_t *ar
     }
     return ptr;
 }
-
 /*
     Emits ARM insns to load effective address and store value from specified register to the EA.
 
