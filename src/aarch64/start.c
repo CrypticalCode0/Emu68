@@ -24,6 +24,7 @@
 #include "RegisterAllocator.h"
 #include "md5.h"
 #include "disasm.h"
+#include "version.h"
 
 void _start();
 void _boot();
@@ -455,6 +456,46 @@ void secondary_boot(void)
 uint32_t vid_memory;
 uintptr_t vid_base;
 
+/* Amiga checksum, taken from AROS source code */
+int amiga_checksum(uint8_t *mem, uintptr_t size, uintptr_t chkoff, int update)
+{
+    uint32_t oldcksum = 0, cksum = 0, prevck = 0;
+    uintptr_t i;
+
+    for (i = 0; i < size; i+=4) {
+        uint32_t val = (mem[i+0] << 24) +
+                       (mem[i+1] << 16) +
+                       (mem[i+2] <<  8) +
+                       (mem[i+3] <<  0);
+
+        /* Clear existing checksum */
+        if (update && (i == chkoff)) {
+                oldcksum = val;
+                val = 0;
+        }
+
+        cksum += val;
+        if (cksum < prevck)
+            cksum++;
+        prevck = cksum;
+    }
+
+    cksum = ~cksum;
+
+    if (update && cksum != oldcksum) {
+        kprintf("Updating checksum from 0x%08x to 0x%08x\n", oldcksum, cksum);
+        
+        mem[chkoff + 0] = (cksum >> 24) & 0xff;
+        mem[chkoff + 1] = (cksum >> 16) & 0xff;
+        mem[chkoff + 2] = (cksum >>  8) & 0xff;
+        mem[chkoff + 3] = (cksum >>  0) & 0xff;
+
+        return 1;
+   }
+
+   return 0;
+}
+
 void boot(void *dtree)
 {
     uintptr_t kernel_top_virt = ((uintptr_t)boot + (KERNEL_SYS_PAGES << 21)) & ~((1 << 21)-1);
@@ -469,6 +510,7 @@ void boot(void *dtree)
 
 #ifdef PISTORM
     int rom_copy = 0;
+    int recalc_checksum = 0;
     int buptest = 0;
     int bupiter = 5;
     vid_memory = 16;
@@ -554,6 +596,10 @@ void boot(void *dtree)
                     vid_memory = vmem & ~1;
                 }
             }
+            if ((tok = find_token(prop->op_value, "checksum_rom")))
+            {
+                recalc_checksum = 1;
+            } 
             if ((tok = find_token(prop->op_value, "copy_rom=")))
             {
                 tok += 9;
@@ -1046,7 +1092,7 @@ void boot(void *dtree)
     {
         extern uint32_t rom_mapped;
 
-        kprintf("[BOOT] Loading ROM from %p\n", initramfs_loc);
+        kprintf("[BOOT] Loading ROM from %p, size %d\n", initramfs_loc, initramfs_size);
         mmu_map(0xf80000, 0xf80000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR(0), 0);
             
         if (initramfs_size == 262144)
@@ -1067,7 +1113,9 @@ void boot(void *dtree)
         else if (initramfs_size == 1048576)
         {
             mmu_map(0xe00000, 0xe00000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR(0), 0);
+            mmu_map(0xf00000, 0xf00000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR(0), 0);
             DuffCopy((void*)0xffffff9000e00000, initramfs_loc, 524288 / 4);
+            DuffCopy((void*)0xffffff9000f00000, initramfs_loc, 524288 / 4);
             DuffCopy((void*)0xffffff9000f80000, (void*)((uintptr_t)initramfs_loc + 524288), 524288 / 4);
         }
         else if (initramfs_size == 2097152) {
@@ -1078,7 +1126,6 @@ void boot(void *dtree)
             DuffCopy((void*)0xffffff9000a80000, (void*)((uintptr_t)initramfs_loc + 524288), 524288 / 4);
             DuffCopy((void*)0xffffff9000b00000, (void*)((uintptr_t)initramfs_loc + 2*524288), 524288 / 4);
             DuffCopy((void*)0xffffff9000f80000, (void*)((uintptr_t)initramfs_loc + 3*524288), 524288 / 4);
-
         }
 
         /* Check if ROM is byte-swapped */
@@ -1175,6 +1222,10 @@ void boot(void *dtree)
     //dt_dump_tree();
 
 #ifdef PISTORM
+    //amiga_checksum((void*)0xffffff9000e00000, 524288, 524288-24, 1);
+    if (recalc_checksum)
+        amiga_checksum((void*)0xffffff9000f80000, 524288, 524288-24, 1);
+
     if (buptest)
     {
         ps_buptest(buptest, bupiter);

@@ -319,6 +319,8 @@ enum
     INTREQR = 0xDFF01E,
 };
 
+int block_c0;
+
 int SYSWriteValToAddr(uint64_t value, int size, uint64_t far)
 {
     D(kprintf("[JIT:SYS] SYSWriteValToAddr(0x%x, %d, %p)\n", value, size, far));
@@ -432,6 +434,11 @@ int SYSWriteValToAddr(uint64_t value, int size, uint64_t far)
         }
     }
 
+    if ((far >= 0xc00000 && far <= 0xc7ffff) && block_c0)
+    {
+        return 1;
+    }
+
     switch(size)
     {
         case 1:
@@ -466,11 +473,20 @@ int SYSReadValFromAddr(uint64_t *value, int size, uint64_t far)
         far &= 0xffffffff;
     }
 
+
+    if ((far >= 0xc00000 && far <= 0xc7ffff) && block_c0)
+    {
+        *value = 0;
+        return 1;
+    }
+
+#if 0
     if (far > (0x1000000ULL - size)) {
      //   kprintf("Illegal FAR %08x\n", far);
         *value = 0;
         return 1;
     }
+#endif
 
     if (far >= 0xe80000 && far <= 0xe8ffff && size == 1)
     {
@@ -1019,6 +1035,12 @@ int SYSPageFaultHandler(uint32_t vector, uint64_t *ctx, uint64_t elr, uint64_t s
             value = get_fpn_as_single(opcode & 31);
             handled = SYSWriteValToAddr(value, 4, far);
         }
+        /* FSTS unsigned offset */
+        else if ((opcode & 0xff400000) == 0xbd000000)
+        {
+            value = get_fpn_as_single(opcode & 31);
+            handled = SYSWriteValToAddr(value, 4, far);
+        }
         /* FSTS pre-index */
         else if ((opcode & 0xfee00c00) == 0xbc000400)
         {
@@ -1043,6 +1065,12 @@ int SYSPageFaultHandler(uint32_t vector, uint64_t *ctx, uint64_t elr, uint64_t s
         }
         /* FSTD */
         else if ((opcode & 0xfee00c00) == 0xfc000000)
+        {
+            value = get_fpn_as_double(opcode & 31);
+            handled = SYSWriteValToAddr(value, 8, far);
+        }
+        /* FSTD unsigned offset */
+        else if ((opcode & 0xff400000) == 0xfd000000)
         {
             value = get_fpn_as_double(opcode & 31);
             handled = SYSWriteValToAddr(value, 8, far);
@@ -1261,6 +1289,15 @@ int SYSPageFaultHandler(uint32_t vector, uint64_t *ctx, uint64_t elr, uint64_t s
                 set_fpn_as_single(opcode & 31, value);
             }
         }
+        /* FLDS unsigned offset */
+        else if ((opcode & 0xff400000) == 0xbd400000)
+        {
+            handled = SYSReadValFromAddr(&value, 4, far);
+            if (handled)
+            {
+                set_fpn_as_single(opcode & 31, value);
+            }
+        }
         /* FLDS pre-index */
         else if ((opcode & 0xfee00c00) == 0xbc400400)
         {
@@ -1287,6 +1324,24 @@ int SYSPageFaultHandler(uint32_t vector, uint64_t *ctx, uint64_t elr, uint64_t s
         }
         /* FLDD */
         else if ((opcode & 0xfee00c00) == 0xfc400000)
+        {
+            handled = SYSReadValFromAddr(&value, 8, far);
+            if (handled)
+            {
+                set_fpn_as_double(opcode & 31, value);
+            }
+        }
+        /* FLDD unsigned offset */
+        else if ((opcode & 0xff400000) == 0xfd400000)
+        {
+            handled = SYSReadValFromAddr(&value, 8, far);
+            if (handled)
+            {
+                set_fpn_as_double(opcode & 31, value);
+            }
+        }
+        /* FLDD reg offset */
+        else if ((opcode & 0xfee00c00) == 0xfc600800)
         {
             handled = SYSReadValFromAddr(&value, 8, far);
             if (handled)
