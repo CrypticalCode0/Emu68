@@ -9,6 +9,7 @@
 
 #include <stdarg.h>
 #include <stdint.h>
+#include "libdeflate.h"
 #include "A64.h"
 #include "config.h"
 #include "support.h"
@@ -496,6 +497,19 @@ int amiga_checksum(uint8_t *mem, uintptr_t size, uintptr_t chkoff, int update)
    return 0;
 }
 
+static void *my_malloc(size_t s)
+{
+    return tlsf_malloc(tlsf, s);
+}
+
+static void my_free(void *ptr)
+{
+    return tlsf_free(tlsf, ptr);
+}
+
+void *firmware_file = NULL;
+uint32_t firmware_size = 0;
+
 void boot(void *dtree)
 {
     uintptr_t kernel_top_virt = ((uintptr_t)boot + (KERNEL_SYS_PAGES << 21)) & ~((1 << 21)-1);
@@ -525,6 +539,9 @@ void boot(void *dtree)
 
     /* Initialize tlsf */
     tlsf = tlsf_init_with_memory(&__bootstrap_end, pool_size);
+
+    /* Initialize memory management for libdeflate */
+    libdeflate_set_memory_allocator(my_malloc, my_free);
 
     /* Parse device tree */
     dt_parse((void*)dtree);
@@ -659,7 +676,8 @@ void boot(void *dtree)
             initramfs_size = (uintptr_t)image_end - (uintptr_t)image_start;
             initramfs_loc = tlsf_malloc(tlsf, initramfs_size);
 
-            DuffCopy(initramfs_loc, (void*)(0xffffff9000000000 + (uintptr_t)image_start), initramfs_size / 4);
+            /* Align the length of image up to nearest 4 byte boundary */
+            DuffCopy(initramfs_loc, (void*)(0xffffff9000000000 + (uintptr_t)image_start), (initramfs_size + 3)/ 4);
         }
     }
 
@@ -668,6 +686,74 @@ void boot(void *dtree)
 
     /* Setup platform (peripherals etc) */
     platform_init();
+
+    /* Test if the image begins with gzip header. If yes, then this is the firmware blob */
+    if (((uint8_t *)initramfs_loc)[0] == 0x1f && ((uint8_t *)initramfs_loc)[1] == 0x8b)
+    {
+        struct libdeflate_decompressor *decomp = libdeflate_alloc_decompressor();
+        
+        if (decomp != NULL)
+        {
+            void *out_buffer = tlsf_malloc(tlsf, 8*1024*1024);
+            size_t in_size = 0;
+            size_t out_size = 0;
+            enum libdeflate_result result;
+
+            result = libdeflate_gzip_decompress_ex(decomp, initramfs_loc, initramfs_size, out_buffer, 8*1024*1024, &in_size, &out_size);
+
+            if (result == LIBDEFLATE_SUCCESS || result == LIBDEFLATE_SHORT_OUTPUT)
+            {
+                /* Shift the rest of initramfs back to original position. */
+                memcpy(initramfs_loc, (void*)((uintptr_t)initramfs_loc + in_size), initramfs_size - in_size);
+                initramfs_size -= in_size;
+                firmware_file = out_buffer;
+                firmware_size = out_size;
+                tlsf_realloc(tlsf, out_buffer, out_size);
+            }
+            else
+            {
+                tlsf_free(tlsf, out_buffer);
+            }
+
+            libdeflate_free_decompressor(decomp);
+        }
+    }
+    else
+    {
+#ifdef PISTORM32LITE
+        #include "../pistorm/efinix_firmware.h"
+        
+        struct libdeflate_decompressor *decomp = libdeflate_alloc_decompressor();
+        
+        if (decomp != NULL)
+        {
+            void *out_buffer = tlsf_malloc(tlsf, 8*1024*1024);
+            size_t in_size = 0;
+            size_t out_size = 0;
+            enum libdeflate_result result;
+
+            result = libdeflate_gzip_decompress_ex(decomp, firmware_bin_gz, firmware_bin_gz_len, out_buffer, 8*1024*1024, &in_size, &out_size);
+
+            if (result == LIBDEFLATE_SUCCESS || result == LIBDEFLATE_SHORT_OUTPUT)
+            {
+                firmware_file = out_buffer;
+                firmware_size = out_size;
+                tlsf_realloc(tlsf, out_buffer, out_size);
+            }
+            else
+            {
+                tlsf_free(tlsf, out_buffer);
+            }
+
+            libdeflate_free_decompressor(decomp);
+        }
+#endif
+    }
+
+#ifdef PISTORM32LITE
+    ps_efinix_setup();
+    ps_efinix_load(firmware_file, firmware_size);
+#endif
 
     /* Setup debug console on serial port */
     setup_serial();
@@ -1641,6 +1727,10 @@ void  __attribute__((used)) stub_ExecutionLoop()
 "       ldrb    w1, [x0, #%[ipl]]           \n" // If IPL was 0 then there is no m68k interrupt pending, skip reading
 "       cbz     w1, 998f                    \n" // IPL in that case
 "992:                                       \n"
+
+// No need to do anything on PiStorm32 - the w1 contains the IPL value already (see few lines above)
+#ifndef PISTORM32
+
 #if PISTORM_WRITE_BUFFER
 "       adrp    x5, bus_lock                \n"
 "       add     x5, x5, :lo12:bus_lock      \n"
@@ -1654,7 +1744,6 @@ void  __attribute__((used)) stub_ExecutionLoop()
 ".lock_acquired:                            \n"
 #endif
 "       mov     x2, #0xf2200000             \n" // GPIO base address
-
 "       mov     w1, #0x0c000000             \n"
 "       mov     w3, #0x40000000             \n"
 
@@ -1674,6 +1763,7 @@ void  __attribute__((used)) stub_ExecutionLoop()
 #endif
 "       rev     w3, w3                      \n"
 "       ubfx    w1, w3, #21, #3             \n" // Extract IPL to w1
+#endif
 
 // We have w10 with ARM IPL here and w1 with m68k IPL, select higher, in case of ARM clear pending bit
 "998:   cmp     w1, w10                     \n" 
