@@ -106,6 +106,19 @@ void RA_SetDirtyM68kRegister(uint32_t **arm_stream, uint8_t m68k_reg)
     (void)m68k_reg;
 }
 
+/* Test if given register is a m68k register */
+int RA_IsM68kRegister(uint8_t arm_reg)
+{
+    const uint32_t test_field = 
+        (1 << REG_D0) | (1 << REG_D1) | (1 << REG_D2) | (1 << REG_D3) |
+        (1 << REG_D4) | (1 << REG_D5) | (1 << REG_D6) | (1 << REG_D7) |
+        (1 << REG_A0) | (1 << REG_A1) | (1 << REG_A2) | (1 << REG_A3) |
+        (1 << REG_A4) | (1 << REG_A5) | (1 << REG_A6) | (1 << REG_A7);
+    
+    if (arm_reg >= 32) return 0;
+    else return (test_field & (1 << arm_reg)) != 0;
+}
+
 /*
     Make a discardable copy of m68k register (e.g. temporary value from reg which can be later worked on)
 */
@@ -307,15 +320,18 @@ void RA_FlushFPSR(uint32_t **ptr)
     mod_FPSR = 0;
 }
 
+/* Note! CC in ARM register has swapped C and V bits!!! */
 uint8_t RA_GetCC(uint32_t **ptr)
 {
     if (reg_CC == 0xff)
     {
+        uint32_t *p = *ptr;
         reg_CC = RA_AllocARMRegister(ptr);
+
 //        uint8_t reg_CTX = RA_GetCTX(ptr);
 //        **ptr = ldrh_offset(reg_CTX, reg_CC, __builtin_offsetof(struct M68KState, SR));
-        **ptr = mrs(reg_CC, 3, 3, 13, 0, 2);
-        (*ptr)++;
+        *p++ = mrs(reg_CC, 3, 3, 13, 0, 2);
+        *ptr = p;
         mod_CC = 0;
     }
 
@@ -333,10 +349,10 @@ void RA_StoreCC(uint32_t **ptr)
 {
     if (reg_CC != 0xff && mod_CC)
     {
-//        uint8_t reg_CTX = RA_GetCTX(ptr);
-//        **ptr = strh_offset(reg_CTX, reg_CC, __builtin_offsetof(struct M68KState, SR));
-        **ptr = msr(reg_CC, 3, 3, 13, 0, 2);
-        (*ptr)++;
+        uint32_t *p = *ptr;
+
+        *p++ = msr(reg_CC, 3, 3, 13, 0, 2);
+        *ptr = p;
     }
 }
 
@@ -346,10 +362,13 @@ void RA_FlushCC(uint32_t **ptr)
     {
         if (mod_CC)
         {
+            uint32_t *p = *ptr;
+
 //        uint8_t reg_CTX = RA_GetCTX(ptr);
 //        **ptr = strh_offset(reg_CTX, reg_CC, __builtin_offsetof(struct M68KState, SR));
-            **ptr = msr(reg_CC, 3, 3, 13, 0, 2);
-            (*ptr)++;
+            *p++ = msr(reg_CC, 3, 3, 13, 0, 2);
+
+            *ptr = p;
         }
         RA_FreeARMRegister(ptr, reg_CC);
     }

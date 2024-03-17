@@ -23,9 +23,12 @@ static uint32_t allocated_len;
 
 void put_word(uint32_t word)
 {
-    if ((sizeof(uint32_t) * (data_len + 1)) > allocated_len)
+    while ((sizeof(uint32_t) * (data_len + 1)) > allocated_len)
     {
-        data = tlsf_realloc(tlsf, data, allocated_len + 4096);
+        uint32_t *new_data = tlsf_malloc(tlsf, allocated_len + 4096);
+        memcpy(new_data, data, allocated_len);
+        tlsf_free(tlsf, data);
+        data = new_data;
         allocated_len += 4096;
     }
 
@@ -34,9 +37,12 @@ void put_word(uint32_t word)
 
 void put_words(uint32_t *words, uint32_t count)
 {
-    if ((sizeof(uint32_t) * (data_len + count)) > allocated_len)
+    while ((sizeof(uint32_t) * (data_len + count)) > allocated_len)
     {
-        data = tlsf_realloc(tlsf, data, allocated_len + 4096);
+        uint32_t *new_data = tlsf_malloc(tlsf, allocated_len + 4096);
+        memcpy(new_data, data, allocated_len);
+        tlsf_free(tlsf, data);
+        data = new_data;
         allocated_len += 4096;
     }
 
@@ -121,8 +127,8 @@ void build_fdt()
     struct fdt_header *fdt_orig = dt_fdt_base();
     struct fdt_header fdt = *fdt_orig;
 
-    data = tlsf_malloc(tlsf, 4096);
-    allocated_len = 4096;
+    data = tlsf_malloc(tlsf, 262144);
+    allocated_len = 262144;
     data_len = 0;
     strings_len = 0;
     strings = NULL;
@@ -165,8 +171,8 @@ static void map(struct ExpansionBoard *board)
     build_fdt();
 
     kprintf("[BOARD] Mapping ZIII devicetree board at address %08x\n", board->map_base);
-    mmu_map(mmu_virt2phys((uintptr_t)board->rom_file), board->map_base, board->rom_size, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR(0), 0);
-    mmu_map(mmu_virt2phys((uintptr_t)fdt_base), board->map_base + board->rom_size, (fdt_base->totalsize + 4095) & ~4095, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR(0), 0);
+    mmu_map(mmu_virt2phys((uintptr_t)board->rom_file), board->map_base, board->rom_size, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR_CACHED, 0);
+    mmu_map(mmu_virt2phys((uintptr_t)fdt_base), board->map_base + board->rom_size, (fdt_base->totalsize + 4095) & ~4095, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR_CACHED, 0);
 }
 
 static struct ExpansionBoard board = {

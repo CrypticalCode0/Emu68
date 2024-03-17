@@ -301,9 +301,8 @@ void vkprintf_pc(putc_func putc_f, void *putc_data, const char * restrict format
                 if (c == 'l')
                 {
                     c = *format++;
-                    length_mod = 8;
                 }
-                else length_mod = 4;
+                length_mod = 8;
             }
             else if (c == 'j')
             {
@@ -808,6 +807,12 @@ const int32_t **__ctype_tolower_loc(void)
     return (void *)&ptable;
 }
 
+int tolower(int c)
+{
+    if (c >= -128 && c < 256)
+        return ptable[c];
+    else return 0;
+}
 
 /*	$NetBSD: qsort.c,v 1.23 2017/05/19 19:48:19 christos Exp $	*/
 /*-

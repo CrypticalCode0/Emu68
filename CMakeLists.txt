@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.14.0)
-project(Emu68 VERSION 0.11.4)
+project(Emu68 VERSION 1.0.0)
+set(PROJECT_VERSION 1.0.0-rc.3)
 
 include(cmake/verstring.cmake)
 include(cmake/firmware_download.cmake)
@@ -31,6 +32,7 @@ set(BASE_FILES
     src/md5.c
     src/disasm.c
     src/findtoken.c
+    src/cache.c
 )
 
 set(EMU68_FILES
@@ -100,11 +102,12 @@ if (${TARGET} IN_LIST SUPPORTED_TARGETS)
         list(APPEND TARGET_FILES src/raspi/support_rpi.c)
         list(APPEND TARGET_FILES src/raspi/topaz.c)
         download_raspi_firmware()
-        install(DIRECTORY ${CMAKE_BINARY_DIR}/firmware/ DESTINATION .)
-        install(FILES ${CMAKE_BINARY_DIR}/Emu68.img DESTINATION .)
         if(${VARIANT} STREQUAL "pistorm" OR ${VARIANT} STREQUAL "pistorm32lite")
-            install(FILES ${CMAKE_SOURCE_DIR}/scripts/config_pistorm.txt DESTINATION . RENAME config.txt)
+            configure_file(scripts/config_pistorm.txt scripts/config.txt @ONLY)
+            install(FILES ${CMAKE_BINARY_DIR}/Emu68.img DESTINATION . RENAME Emu68-${VARIANT})
+            install(FILES ${CMAKE_BINARY_DIR}/scripts/config.txt DESTINATION .)
         else()
+            install(FILES ${CMAKE_BINARY_DIR}/Emu68.img DESTINATION .)
             install(FILES ${CMAKE_SOURCE_DIR}/scripts/config.txt DESTINATION .)
         endif()
         add_compile_definitions(RASPI)
@@ -156,6 +159,7 @@ if (${VARIANT} IN_LIST SUPPORTED_VARIANTS)
                 src/boards/sdcard.c
                 src/boards/68040.c
                 src/boards/emmc.c
+                src/boards/unicam.c
             )
         else()
             message(FATAL_ERROR "PiStorm variants are supported on raspi targets, only.")
@@ -187,7 +191,7 @@ else()
     )
     set(CAPSTONE_ARM64_SUPPORT ON CACHE BOOL "CAPSTONE_ARM64_SUPPORT")
     set(LINKER_SCRIPT ${CMAKE_SOURCE_DIR}/scripts/ldscript-be64.lds)
-    add_link_options(-Wl,-EB -Wl,--format=elf64-bigaarch64 -T ${LINKER_SCRIPT})
+    add_link_options(-Wl,-EB -Wl,-Map -Wl,${CMAKE_BINARY_DIR}/Emu68.map -Wl,--format=elf64-bigaarch64 -T ${LINKER_SCRIPT})
     add_compile_options(-march=armv8-a+crc -mtune=cortex-a72 -fomit-frame-pointer -O3 -ffixed-x12 -ffixed-q31 -ffixed-q30 -ffixed-q29 -ffixed-q28)
 
     if (CMAKE_COMPILER_IS_GNUCC AND CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL 10.0)

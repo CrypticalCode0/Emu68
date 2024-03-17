@@ -119,6 +119,7 @@ struct M68KState
     uint32_t JIT_CACHE_FREE;
     uint32_t JIT_SOFTFLUSH_THRESH;
     uint32_t JIT_CONTROL;
+    uint32_t JIT_CONTROL2;
 };
 
 #define JCCB_SOFT               0
@@ -131,6 +132,16 @@ struct M68KState
 #define JCCB_LOOP_COUNT         4
 #define JCCB_LOOP_COUNT_MASK    0xf
 
+#define JC2B_CHIP_SLOWDOWN              0
+#define JC2F_CHIP_SLOWDOWN              (1 << JC2B_CHIP_SLOWDOWN)
+#define JC2B_DBF_SLOWDOWN               1
+#define JC2F_DBF_SLOWDOWN               (1 << JC2B_DBF_SLOWDOWN)
+#define JC2B_CCR_SCAN_DEPTH             3
+#define JC2_CCR_SCAN_MASK               0x1f
+#define JC2B_CHIP_SLOWDOWN_RATIO        8
+#define JC2_CHIP_SLOWDOWN_RATIO_MASK    0x07
+#define JC2B_BLITWAIT                   11
+#define JC2F_BLITWAIT                   (1 << JC2B_BLITWAIT)
 
 #define DCB_VERBOSE 0
 #define DCB_VERBOSE_MASK 0x3
@@ -144,6 +155,23 @@ struct M68KState
 #define CACRB_IE 15
 
 //SR
+#define SR_Calt 0x0002
+#define SR_Valt 0x0001
+#define SR_ZCalt 0x0006
+#define SR_ZValt 0x0005
+#define SR_NCalt 0x000a
+#define SR_NValt 0x0009
+#define SR_NZCalt 0x000e
+#define SR_NZValt 0x000d
+#define SR_XCalt 0x0012
+#define SR_XValt 0x0011
+#define SR_XZCalt 0x0016
+#define SR_XZValt 0x0015
+#define SR_XNCalt 0x001a
+#define SR_XNValt 0x0019
+#define SR_XNZCalt 0x001e
+#define SR_XNZValt 0x001d
+
 #define SR_C    0x0001
 #define SR_V    0x0002
 #define SR_VC   0x0003
@@ -182,6 +210,9 @@ struct M68KState
 #define SR_T1   0x8000
 
 #define SR_ALL  0xf71f
+
+#define SRB_Calt 1
+#define SRB_Valt 0
 
 #define SRB_C    0
 #define SRB_V    1
@@ -355,8 +386,10 @@ uint32_t *EMIT_AdvancePC(uint32_t *ptr, uint8_t offset);
 uint32_t *EMIT_FlushPC(uint32_t *ptr);
 uint32_t *EMIT_ResetOffsetPC(uint32_t *ptr);
 uint32_t *EMIT_LoadFromEffectiveAddress(uint32_t *ptr, uint8_t size, uint8_t *arm_reg, uint8_t ea, uint16_t *m68k_ptr, uint8_t *ext_words, uint8_t read_only, int32_t *imm_offset);
-uint32_t *EMIT_StoreToEffectiveAddress(uint32_t *ptr, uint8_t size, uint8_t *arm_reg, uint8_t ea, uint16_t *m68k_ptr, uint8_t *ext_words);
+uint32_t *EMIT_StoreToEffectiveAddress(uint32_t *ptr, uint8_t size, uint8_t *arm_reg, uint8_t ea, uint16_t *m68k_ptr, uint8_t *ext_words, int sign_extend);
 uint32_t *EMIT_Exception(uint32_t *ptr, uint16_t exception, uint8_t format, ...);
+uint32_t *EMIT_LocalExit(uint32_t *ptr, uint32_t insn_count_fixup);
+uint32_t *EMIT_JumpOnCondition(uint32_t *ptr, uint8_t m68k_condition, uint32_t distance);
 
 uint32_t *EMIT_line0(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed);
 uint32_t *EMIT_line4(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed);

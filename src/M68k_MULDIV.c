@@ -11,6 +11,7 @@
 #include "M68k.h"
 #include "RegisterAllocator.h"
 #include "EmuFeatures.h"
+#include "cache.h"
 
 uint32_t *EMIT_MULU(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr) __attribute__((alias("EMIT_MUL_DIV")));
 uint32_t *EMIT_MULS(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr) __attribute__((alias("EMIT_MUL_DIV")));
@@ -115,7 +116,7 @@ uint32_t *EMIT_MULS_L(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     uint8_t reg_dh = 0xff;
     uint8_t src = 0xff;
     uint8_t ext_words = 1;
-    uint16_t opcode2 = BE16((*m68k_ptr)[0]);
+    uint16_t opcode2 = cache_read_16(ICACHE, (uintptr_t)&(*m68k_ptr)[0]);
 
     // Fetch 32-bit register: source and destination
     reg_dl = RA_MapM68kRegister(&ptr, (opcode2 >> 12) & 7);
@@ -169,7 +170,7 @@ uint32_t *EMIT_MULS_L(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
             ptr = EMIT_SetFlagsConditional(ptr, cc, SR_N, ARM_CC_MI);
         }
         if ((update_mask & SR_V) && 0 == (opcode2 & (1 << 10))) {
-            ptr = EMIT_ClearFlags(ptr, cc, SR_V);
+            ptr = EMIT_ClearFlags(ptr, cc, SR_Valt);
 
             uint8_t tmp = RA_AllocARMRegister(&ptr);
             /* If signed multiply check higher 32bit against 0 or -1. For unsigned multiply upper 32 bit must be zero */
@@ -182,7 +183,7 @@ uint32_t *EMIT_MULS_L(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
             *ptr++ = cmp64_reg(tmp, reg_dl, LSR, 32);
             RA_FreeARMRegister(&ptr, tmp);
 
-            ptr = EMIT_SetFlagsConditional(ptr, cc, SR_V, ARM_CC_NE);
+            ptr = EMIT_SetFlagsConditional(ptr, cc, SR_Valt, ARM_CC_NE);
         }
     }
 
@@ -267,11 +268,13 @@ uint32_t *EMIT_DIVS_W(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     if (update_mask)
     {
         uint8_t cc = RA_ModifyCC(&ptr);
-
-        ptr = EMIT_ClearFlags(ptr, cc, update_mask);
+        uint8_t alt_mask = update_mask;
+        if ((alt_mask & 3) != 0 && (alt_mask & 3) < 3)
+            alt_mask ^= 3;
+        ptr = EMIT_ClearFlags(ptr, cc, alt_mask);
 
         if (update_mask & SR_V) {
-            ptr = EMIT_SetFlagsConditional(ptr, cc, SR_V, ARM_CC_NE);
+            ptr = EMIT_SetFlagsConditional(ptr, cc, SR_Valt, ARM_CC_NE);
         }
         if (update_mask & (SR_Z | SR_N))
         {
@@ -382,12 +385,14 @@ uint32_t *EMIT_DIVU_W(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     if (update_mask)
     {
         uint8_t cc = RA_ModifyCC(&ptr);
-
-        ptr = EMIT_ClearFlags(ptr, cc, update_mask);
+        uint8_t alt_mask = update_mask;
+        if ((alt_mask & 3) != 0 && (alt_mask & 3) < 3)
+            alt_mask ^= 3;
+        ptr = EMIT_ClearFlags(ptr, cc, alt_mask);
 
         if (update_mask & SR_V) {
             
-            ptr = EMIT_SetFlagsConditional(ptr, cc, SR_V, ARM_CC_NE);
+            ptr = EMIT_SetFlagsConditional(ptr, cc, SR_Valt, ARM_CC_NE);
         }
 
         if (update_mask & (SR_Z | SR_N))
@@ -418,7 +423,7 @@ uint32_t *EMIT_DIVU_W(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
 uint32_t *EMIT_DIVUS_L(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
 {
     uint8_t update_mask = M68K_GetSRMask(*m68k_ptr - 1);
-    uint16_t opcode2 = BE16((*m68k_ptr)[0]);
+    uint16_t opcode2 = cache_read_16(ICACHE, (uintptr_t)&(*m68k_ptr)[0]);
     uint8_t sig = (opcode2 & (1 << 11)) != 0;
     uint8_t div64 = (opcode2 & (1 << 10)) != 0;
     uint8_t reg_q = 0xff;
@@ -554,9 +559,9 @@ uint32_t *EMIT_DIVUS_L(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     {
         uint8_t cc = RA_ModifyCC(&ptr);
         if (update_mask & SR_VC) {
-            ptr = EMIT_ClearFlags(ptr, cc, SR_V | SR_C);
+            ptr = EMIT_ClearFlags(ptr, cc, SR_Valt | SR_Calt);
             if (div64) {
-                ptr = EMIT_SetFlagsConditional(ptr, cc, SR_V, ARM_CC_NE);
+                ptr = EMIT_SetFlagsConditional(ptr, cc, SR_Valt, ARM_CC_NE);
             }
         }
         if (update_mask & (SR_Z | SR_N))

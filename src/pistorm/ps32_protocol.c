@@ -15,6 +15,12 @@
 #include "tlsf.h"
 #include "ps_protocol.h"
 #include "M68k.h"
+#include "cache.h"
+
+//volatile uint8_t gpio_lock;
+//volatile uint32_t gpio_rdval;
+
+extern struct M68KState *__m68k_state;
 
 static void usleep(uint64_t delta)
 {
@@ -136,11 +142,11 @@ typedef unsigned int uint;
 
 #define GPFSEL0_INPUT (GO(PIN_WR) | GO(PIN_RD) | GO(SER_OUT_BIT))
 #define GPFSEL1_INPUT (0)
-#define GPFSEL2_INPUT (GO(PIN_A(2)) | GO(PIN_A(1)) | GO(PIN_A(0)) | GO(SER_OUT_CLK))
+#define GPFSEL2_INPUT (GO(29) | GO(PIN_A(2)) | GO(PIN_A(1)) | GO(PIN_A(0)) | GO(SER_OUT_CLK))
 
 #define GPFSEL0_OUTPUT (GO(PIN_D(1)) | GO(PIN_D(0)) | GO(PIN_WR) | GO(PIN_RD) | GO(SER_OUT_BIT))
 #define GPFSEL1_OUTPUT (GO(PIN_D(11)) | GO(PIN_D(10)) | GO(PIN_D(9)) | GO(PIN_D(8)) | GO(PIN_D(7)) | GO(PIN_D(6)) | GO(PIN_D(5)) | GO(PIN_D(4)) | GO(PIN_D(3)) | GO(PIN_D(2)))
-#define GPFSEL2_OUTPUT (GO(PIN_A(2)) | GO(PIN_A(1)) | GO(PIN_A(0)) | GO(PIN_D(15)) | GO(PIN_D(14)) | GO(PIN_D(13)) | GO(PIN_D(12)) | GO(SER_OUT_CLK))
+#define GPFSEL2_OUTPUT (GO(29) | GO(PIN_A(2)) | GO(PIN_A(1)) | GO(PIN_A(0)) | GO(PIN_D(15)) | GO(PIN_D(14)) | GO(PIN_D(13)) | GO(PIN_D(12)) | GO(SER_OUT_CLK))
 
 #define REG_DATA_LO     0
 #define REG_DATA_HI     1
@@ -148,6 +154,7 @@ typedef unsigned int uint;
 #define REG_ADDR_HI     3
 #define REG_STATUS      4
 #define REG_CONTROL     4
+#define REG_VERSION     7
 
 #define TXN_SIZE_SHIFT  8
 #define TXN_RW_SHIFT    10
@@ -176,8 +183,12 @@ typedef unsigned int uint;
 #define DIRECTION_INPUT 0
 #define DIRECTION_OUTPUT 1
 
-volatile unsigned int *gpio;
-volatile unsigned int *gpclk;
+volatile uint32_t *gpio;
+volatile uint32_t *gpset;
+volatile uint32_t *gpreset;
+volatile uint32_t *gpread;
+
+uint32_t use_2slot = 1;
 
 static inline void set_input() {
     *(gpio + 0) = LE32(GPFSEL0_INPUT);
@@ -206,66 +217,104 @@ void pistorm_setup_serial()
     *(gpio + REG(SER_OUT_CLK)) = fsel;
 }
 
-static void pistorm_setup_io() {
-    gpio = ((volatile unsigned *)BCM2708_PERI_BASE) + GPIO_ADDR / 4;
-    gpclk = ((volatile unsigned *)BCM2708_PERI_BASE) + GPCLK_ADDR / 4;
-}
-
-void ps_setup_protocol() {
-    pistorm_setup_io();
-    pistorm_setup_serial();
-
-    *(gpio + 10) = LE32(CLEAR_BITS);
-
-    set_input();
+static void pistorm_setup_io()
+{
+    gpio =    ((volatile uint32_t *)BCM2708_PERI_BASE) + GPIO_ADDR / 4;
+    gpset =   ((volatile uint32_t *)gpio) + 7;// *(gpio + 7);
+    gpreset = ((volatile uint32_t *)gpio) + 10;// *(gpio + 10);
+    gpread =  ((volatile uint32_t *)gpio) + 13;// *(gpio + 13);
 }
 
 static inline void write_ps_reg(unsigned int address, unsigned int data)
 {
-    *(gpio + 7) = LE32((SPLIT_DATA(data) << PIN_D(0)) | (address << PIN_A(0)));
-    *(gpio + 10) = LE32(1 << PIN_WR);
-    *(gpio + 10) = LE32(1 << PIN_WR);
-    *(gpio + 10) = LE32(1 << PIN_WR);
+    *gpset = LE32((SPLIT_DATA(data) << PIN_D(0)) | (address << PIN_A(0)));
 
-    *(gpio + 7) = LE32(1 << PIN_WR);
-    *(gpio + 7) = LE32(1 << PIN_WR);
-    *(gpio + 10) = LE32(CLEAR_BITS);
+    //Delay for Pi4, 2*3.5nS
+    *gpreset = LE32(1 << PIN_WR); *gpreset = LE32(1 << PIN_WR); *gpreset = LE32(1 << PIN_WR);
+
+    *gpset = LE32(1 << PIN_WR);
+    *gpreset = LE32(CLEAR_BITS);
 }
 
 static inline unsigned int read_ps_reg(unsigned int address)
 {
-    *(gpio + 7) = LE32((address << PIN_A(0)));
-    *(gpio + 10) = LE32(1 << PIN_RD);
-    *(gpio + 10) = LE32(1 << PIN_RD);
+    *gpset = LE32(address << PIN_A(0));
 
-    unsigned int data = LE32(*(gpio + 13));
-    data = LE32(*(gpio + 13)); //pi3
+    //Delay for Pi3, 3*7.5nS , or 3*3.5nS for
+    *gpreset = LE32(1 << PIN_RD); *gpreset = LE32(1 << PIN_RD); *gpreset = LE32(1 << PIN_RD); // *gpreset = LE32(1 << PIN_RD);
 
-    *(gpio + 7) = LE32(1 << PIN_RD);
-    *(gpio + 7) = LE32(1 << PIN_RD);
-    *(gpio + 10) = LE32(CLEAR_BITS);
+    unsigned int data = LE32(*gpread);
+    data = LE32(*gpread);
+    /*
+    data = LE32(*gpread);
+    data = LE32(*gpread);
+    */
+    *gpset = LE32(1 << PIN_RD);
+    *gpreset = LE32(CLEAR_BITS);
+
+//    gpio_rdval = data;
 
     data = MERGE_DATA(data >> PIN_D(0)) & 0xffff;
+
     return data;
 }
 
+static inline unsigned int read_ps_reg_with_wait(unsigned int address)
+{
+    *gpset = LE32(address << PIN_A(0));
+
+    //Delay for Pi3, 3*7.5nS , or 3*3.5nS for
+    *gpreset = LE32(1 << PIN_RD); *gpreset = LE32(1 << PIN_RD); *gpreset = LE32(1 << PIN_RD); //*gpreset = LE32(1 << PIN_RD);
+
+    unsigned int data;
+    while ((data = *gpread) & LE32(1 << PIN_TXN)) asm volatile("yield");
+    data = LE32(*gpread);
+    /*
+    data = LE32(*gpread);
+    data = LE32(*gpread);
+    */
+    *gpset = LE32(1 << PIN_RD);
+    *gpreset = LE32(CLEAR_BITS);
+
+//    gpio_rdval = data;
+
+    data = MERGE_DATA(data >> PIN_D(0)) & 0xffff;
+
+    return data;
+}
+
+
 void ps_set_control(unsigned int value)
 {
+//    while(__atomic_test_and_set(&gpio_lock, __ATOMIC_ACQUIRE)) asm volatile("yield");
+
     set_output();
     write_ps_reg(REG_CONTROL, 0x8000 | (value & 0x7fff));
     set_input();
+
+//    __atomic_clear(&gpio_lock, __ATOMIC_RELEASE);
 }
 
 void ps_clr_control(unsigned int value)
 {
+//    while(__atomic_test_and_set(&gpio_lock, __ATOMIC_ACQUIRE)) asm volatile("yield");
+
     set_output();
     write_ps_reg(REG_CONTROL, value & 0x7fff);
     set_input();
+
+//    __atomic_clear(&gpio_lock, __ATOMIC_RELEASE);
 }
 
 unsigned int ps_read_status()
 {
-    return read_ps_reg(REG_STATUS);
+//    while(__atomic_test_and_set(&gpio_lock, __ATOMIC_ACQUIRE)) asm volatile("yield");
+    
+    unsigned int status = read_ps_reg(REG_STATUS);
+
+//    __atomic_clear(&gpio_lock, __ATOMIC_RELEASE);
+
+    return status;
 }
 
 static uint g_fc = 0;
@@ -275,9 +324,25 @@ void cpu_set_fc(unsigned int fc)
     g_fc = fc;
 }
 
-static void do_write_access(unsigned int address, unsigned int data, unsigned int size)
+static int next_slot = 0;
+static int slot_active[2] = {0, 0};
+#define REG_SLOT        5
+#define CONTROL_INC_EXEC_SLOT (1 << 5)
+
+static void do_write_access_2s(unsigned int address, unsigned int data, unsigned int size)
 {
+    uint32_t rdval = 0;
+
+//    while(__atomic_test_and_set(&gpio_lock, __ATOMIC_ACQUIRE)) asm volatile("yield");
+
     set_output();
+
+    write_ps_reg(REG_SLOT, next_slot);
+    if (slot_active[next_slot])
+    {
+        while ((rdval = *gpread) & LE32(1 << PIN_TXN)) asm volatile("yield");
+//        gpio_rdval = LE32(rdval);
+    }
 
     write_ps_reg(REG_DATA_LO, data & 0xffff);
     if (size == SIZE_LONG)
@@ -287,16 +352,213 @@ static void do_write_access(unsigned int address, unsigned int data, unsigned in
     write_ps_reg(REG_ADDR_HI, TXN_WRITE | (g_fc << TXN_FC_SHIFT) | (size << TXN_SIZE_SHIFT) | ((address >> 16) & 0xff));
 
     set_input();
+   
+    /* For chip memory advance to next slot, for chipset access wait for completion of the transaction */
+    if (address >= 0x00bf0000 && address <= 0x00dfffff)
+    {
+        while ((rdval = *gpread) & LE32(1 << PIN_TXN)) asm volatile("yield");
+//        gpio_rdval = LE32(rdval);
+        slot_active[next_slot] = 0;
+    }
+    else
+    {
+        slot_active[next_slot] = 1;
+    }
 
-    while (*(gpio + 13) & LE32(1 << PIN_TXN)) {}
+//    __atomic_clear(&gpio_lock, __ATOMIC_RELEASE);
+
+    next_slot = (next_slot + 1) & 1;
+
+    if (address >= 0x00bf0000 && address <= 0x00dfffff) ps_read_32(0x00f80000);
 }
 
-static int do_read_access(unsigned int address, unsigned int size)
+static inline void do_write_access_64_2s(unsigned int address, uint64_t data)
 {
-    if (address == 0xf00000)
-        usleep(1000);
+    uint32_t rdval = 0;
+
+//    while(__atomic_test_and_set(&gpio_lock, __ATOMIC_ACQUIRE)) asm volatile("yield");
 
     set_output();
+
+    write_ps_reg(REG_SLOT, next_slot);
+    if (slot_active[next_slot])
+    {
+        while ((rdval = *gpread) & LE32(1 << PIN_TXN)) asm volatile("yield");
+//        gpio_rdval = LE32(rdval);
+    }
+
+    /* Set first long word to write */
+    write_ps_reg(REG_DATA_LO, (data >> 32) & 0xffff);
+    write_ps_reg(REG_DATA_HI, (data >> 48) & 0xffff);
+
+    /* Set address and start transaction */
+    write_ps_reg(REG_ADDR_LO, address & 0xffff);
+    write_ps_reg(REG_ADDR_HI, TXN_WRITE | (g_fc << TXN_FC_SHIFT) | (SIZE_LONG << TXN_SIZE_SHIFT) | ((address >> 16) & 0xff));
+
+    slot_active[next_slot] = 1;
+    next_slot = (next_slot + 1) & 1;
+
+    write_ps_reg(REG_SLOT, next_slot);
+    if (slot_active[next_slot])
+    {
+        while ((rdval = *gpread) & LE32(1 << PIN_TXN)) asm volatile("yield");
+//        gpio_rdval = LE32(rdval);
+    }
+
+    /* Advance the address, set second long word to write */
+    address += 4;
+
+    /* Set second long word to write */
+    write_ps_reg(REG_DATA_LO, (data) & 0xffff);
+    write_ps_reg(REG_DATA_HI, (data >> 16) & 0xffff);
+
+    /* Set address */
+    write_ps_reg(REG_ADDR_LO, address & 0xffff);
+
+    /* Start second transaction */
+    write_ps_reg(REG_ADDR_HI, TXN_WRITE | (g_fc << TXN_FC_SHIFT) | (SIZE_LONG << TXN_SIZE_SHIFT) | ((address >> 16) & 0xff));
+
+    set_input();
+   
+    /* For chip memory advance to next slot, for chipset access wait for completion of the transaction */
+    if (address >= 0x00bf0000 && address <= 0x00dfffff)
+    {
+        while ((rdval = *gpread) & LE32(1 << PIN_TXN)) asm volatile("yield");
+//        gpio_rdval = LE32(rdval);
+        slot_active[next_slot] = 0;
+    }
+    else
+    {
+        slot_active[next_slot] = 1;
+    }
+
+//    __atomic_clear(&gpio_lock, __ATOMIC_RELEASE);
+
+    next_slot = (next_slot + 1) & 1;
+
+    if (address >= 0x00bf0000 && address <= 0x00dfffff) ps_read_32(0x00f80000);
+}
+
+static inline void do_write_access_128_2s(unsigned int address, uint128_t data)
+{
+    uint32_t rdval = 0;
+
+    //while(__atomic_test_and_set(&gpio_lock, __ATOMIC_ACQUIRE)) asm volatile("yield");
+
+    set_output();
+    write_ps_reg(REG_SLOT, next_slot);
+    if (slot_active[next_slot])
+    {
+        while ((rdval = *gpread) & LE32(1 << PIN_TXN)) asm volatile("yield");
+        //gpio_rdval = LE32(rdval);
+    }
+
+    /* Set first long word to write */
+    write_ps_reg(REG_DATA_LO, (data.hi >> 32) & 0xffff);
+    write_ps_reg(REG_DATA_HI, (data.hi >> 48) & 0xffff);
+
+    /* Set address and start transaction */
+    write_ps_reg(REG_ADDR_LO, address & 0xffff);
+    write_ps_reg(REG_ADDR_HI, TXN_WRITE | (g_fc << TXN_FC_SHIFT) | (SIZE_LONG << TXN_SIZE_SHIFT) | ((address >> 16) & 0xff));
+
+    slot_active[next_slot] = 1;
+    next_slot = (next_slot + 1) & 1;
+    write_ps_reg(REG_SLOT, next_slot);
+    if (slot_active[next_slot])
+    {
+        while ((rdval = *gpread) & LE32(1 << PIN_TXN)) asm volatile("yield");
+//        gpio_rdval = LE32(rdval);
+    }
+
+    /* Advance the address, set second long word to write */
+    address += 4;
+
+    /* Set second long word to write */
+    write_ps_reg(REG_DATA_LO, (data.hi) & 0xffff);
+    write_ps_reg(REG_DATA_HI, (data.hi >> 16) & 0xffff);
+
+    /* Set address */
+    write_ps_reg(REG_ADDR_LO, address & 0xffff);
+
+    /* Start second transaction */
+    write_ps_reg(REG_ADDR_HI, TXN_WRITE | (g_fc << TXN_FC_SHIFT) | (SIZE_LONG << TXN_SIZE_SHIFT) | ((address >> 16) & 0xff));
+
+    slot_active[next_slot] = 1;
+    next_slot = (next_slot + 1) & 1;
+    write_ps_reg(REG_SLOT, next_slot);
+    if (slot_active[next_slot])
+    {
+        while ((rdval = *gpread) & LE32(1 << PIN_TXN)) asm volatile("yield");
+//        gpio_rdval = LE32(rdval);
+    }
+
+    address += 4;
+
+    /* Set third long word to write */
+    write_ps_reg(REG_DATA_LO, (data.lo >> 32) & 0xffff);
+    write_ps_reg(REG_DATA_HI, (data.lo >> 48) & 0xffff);
+
+    /* Set address */
+    write_ps_reg(REG_ADDR_LO, address & 0xffff);
+
+    /* Start third transaction */
+    write_ps_reg(REG_ADDR_HI, TXN_WRITE | (g_fc << TXN_FC_SHIFT) | (SIZE_LONG << TXN_SIZE_SHIFT) | ((address >> 16) & 0xff));
+
+    address += 4;
+
+    slot_active[next_slot] = 1;
+    next_slot = (next_slot + 1) & 1;
+    write_ps_reg(REG_SLOT, next_slot);
+    if (slot_active[next_slot])
+    {
+        while ((rdval = *gpread) & LE32(1 << PIN_TXN)) asm volatile("yield");
+//        gpio_rdval = LE32(rdval);
+    }
+
+    /* Set second long word to write */
+    write_ps_reg(REG_DATA_LO, (data.lo) & 0xffff);
+    write_ps_reg(REG_DATA_HI, (data.lo >> 16) & 0xffff);
+
+    /* Set address */
+    write_ps_reg(REG_ADDR_LO, address & 0xffff);
+
+    /* Start fourth transaction */
+    write_ps_reg(REG_ADDR_HI, TXN_WRITE | (g_fc << TXN_FC_SHIFT) | (SIZE_LONG << TXN_SIZE_SHIFT) | ((address >> 16) & 0xff));
+
+    set_input();
+
+    /* For chip memory advance to next slot, for chipset access wait for completion of the transaction */
+    if (address >= 0x00bf0000 && address <= 0x00dfffff)
+    {
+        while ((rdval = *gpread) & LE32(1 << PIN_TXN)) asm volatile("yield");
+//        gpio_rdval = LE32(rdval);
+        slot_active[next_slot] = 0;
+    }
+    else
+    {
+        slot_active[next_slot] = 1;
+    }
+
+//    __atomic_clear(&gpio_lock, __ATOMIC_RELEASE);
+
+    next_slot = (next_slot + 1) & 1;
+
+    if (address >= 0x00bf0000 && address <= 0x00dfffff) ps_read_32(0x00f80000);
+}
+
+static int do_read_access_2s(unsigned int address, unsigned int size)
+{
+    uint32_t rdval = 0;
+
+//    while(__atomic_test_and_set(&gpio_lock, __ATOMIC_ACQUIRE)) asm volatile("yield");
+
+    set_output();
+    write_ps_reg(REG_SLOT, next_slot);
+    if (slot_active[next_slot])
+    {
+        while ((rdval = *gpread) & LE32(1 << PIN_TXN)) asm volatile("yield");
+        //gpio_rdval = LE32(rdval);
+    }
 
     write_ps_reg(REG_ADDR_LO, address & 0xffff);
     write_ps_reg(REG_ADDR_HI, TXN_READ | (g_fc << TXN_FC_SHIFT) | (size << TXN_SIZE_SHIFT) | ((address >> 16) & 0xff));
@@ -304,7 +566,8 @@ static int do_read_access(unsigned int address, unsigned int size)
     set_input();
     unsigned int data;
 
-    while (*(gpio + 13) & LE32(1 << PIN_TXN)) {}
+    while ((rdval = *gpread) & LE32(1 << PIN_TXN)) asm volatile("yield");
+//    gpio_rdval = LE32(rdval);
 
     data = read_ps_reg(REG_DATA_LO);
     if (size == SIZE_BYTE)
@@ -312,31 +575,674 @@ static int do_read_access(unsigned int address, unsigned int size)
     else if (size == SIZE_LONG)
         data |= read_ps_reg(REG_DATA_HI) << 16;
 
+//    __atomic_clear(&gpio_lock, __ATOMIC_RELEASE);
+
+    slot_active[next_slot] = 0;
+    next_slot = (next_slot + 1) & 1;
+
     return data;
 }
 
+static inline uint64_t do_read_access_64_2s(unsigned int address)
+{
+    uint64_t data;
+    uint32_t rdval = 0;
+
+//    while(__atomic_test_and_set(&gpio_lock, __ATOMIC_ACQUIRE)) asm volatile("yield");
+
+    set_output();
+    write_ps_reg(REG_SLOT, next_slot);
+    if (slot_active[next_slot])
+    {
+        while ((rdval = *gpread) & LE32(1 << PIN_TXN)) asm volatile("yield");
+//        gpio_rdval = LE32(rdval);
+    }
+
+    write_ps_reg(REG_ADDR_LO, address & 0xffff);
+    write_ps_reg(REG_ADDR_HI, TXN_READ | (g_fc << TXN_FC_SHIFT) | (SIZE_LONG << TXN_SIZE_SHIFT) | ((address >> 16) & 0xff));
+
+    set_input();
+
+    while ((rdval = *gpread) & LE32(1 << PIN_TXN)) asm volatile("yield");
+//    gpio_rdval = LE32(rdval);
+
+    address += 4;
+
+    data = (uint64_t)read_ps_reg(REG_DATA_HI) << 48;
+    data |= (uint64_t)read_ps_reg(REG_DATA_LO) << 32;
+    slot_active[next_slot] = 0;
+    next_slot = (next_slot + 1) & 1;
+
+    set_output();
+    write_ps_reg(REG_SLOT, next_slot);
+    //if (slot_active[next_slot])
+    //{
+    //    while ((rdval = *gpread) & LE32(1 << PIN_TXN)) asm volatile("yield");
+    //    gpio_rdval = LE32(rdval);
+    //}
+
+    write_ps_reg(REG_ADDR_LO, address & 0xffff);
+    write_ps_reg(REG_ADDR_HI, TXN_READ | (g_fc << TXN_FC_SHIFT) | (SIZE_LONG << TXN_SIZE_SHIFT) | ((address >> 16) & 0xff));
+
+    set_input();
+
+    while ((rdval = *gpread) & LE32(1 << PIN_TXN)) asm volatile("yield");
+//    gpio_rdval = LE32(rdval);
+
+    slot_active[next_slot] = 0;
+    next_slot = (next_slot + 1) & 1;
+
+    data |= (uint64_t)read_ps_reg(REG_DATA_HI) << 16;
+    data |= (uint64_t)read_ps_reg(REG_DATA_LO);
+
+//    __atomic_clear(&gpio_lock, __ATOMIC_RELEASE);
+
+    return data;
+}
+
+static inline uint128_t do_read_access_128_2s(unsigned int address)
+{
+    uint128_t data;
+    uint32_t rdval = 0;
+
+//    while(__atomic_test_and_set(&gpio_lock, __ATOMIC_ACQUIRE)) asm volatile("yield");
+
+    set_output();
+    write_ps_reg(REG_SLOT, next_slot);
+    if (slot_active[next_slot])
+    {
+        while ((rdval = *gpread) & LE32(1 << PIN_TXN)) asm volatile("yield");
+//        gpio_rdval = LE32(rdval);
+    }
+
+    write_ps_reg(REG_ADDR_LO, address & 0xffff);
+    write_ps_reg(REG_ADDR_HI, TXN_READ | (g_fc << TXN_FC_SHIFT) | (SIZE_LONG << TXN_SIZE_SHIFT) | ((address >> 16) & 0xff));
+
+    set_input();
+
+    while ((rdval = *gpread) & LE32(1 << PIN_TXN)) asm volatile("yield");
+//    gpio_rdval = LE32(rdval);
+
+    address += 4;
+    data.hi = (uint64_t)read_ps_reg(REG_DATA_HI) << 48;
+    data.hi |= (uint64_t)read_ps_reg(REG_DATA_LO) << 32;
+    slot_active[next_slot] = 0;
+    next_slot = (next_slot + 1) & 1;
+
+    set_output();
+    write_ps_reg(REG_SLOT, next_slot);
+    //if (slot_active[next_slot])
+    //{
+    //    while ((rdval = *gpread) & LE32(1 << PIN_TXN)) asm volatile("yield");
+    //    gpio_rdval = LE32(rdval);
+    //}
+
+    write_ps_reg(REG_ADDR_LO, address & 0xffff);
+    write_ps_reg(REG_ADDR_HI, TXN_READ | (g_fc << TXN_FC_SHIFT) | (SIZE_LONG << TXN_SIZE_SHIFT) | ((address >> 16) & 0xff));
+
+    set_input();
+
+    while ((rdval = *gpread) & LE32(1 << PIN_TXN)) asm volatile("yield");
+//    gpio_rdval = LE32(rdval);
+
+    address += 4;
+    data.hi |= (uint64_t)read_ps_reg(REG_DATA_HI) << 16;
+    data.hi |= (uint64_t)read_ps_reg(REG_DATA_LO);
+    slot_active[next_slot] = 0;
+    next_slot = (next_slot + 1) & 1;
+
+    set_output();
+    write_ps_reg(REG_SLOT, next_slot);
+    //if (slot_active[next_slot])
+    //{
+    //    while ((rdval = *gpread) & LE32(1 << PIN_TXN)) asm volatile("yield");
+    //    gpio_rdval = LE32(rdval);
+    //}
+
+    write_ps_reg(REG_ADDR_LO, address & 0xffff);
+    write_ps_reg(REG_ADDR_HI, TXN_READ | (g_fc << TXN_FC_SHIFT) | (SIZE_LONG << TXN_SIZE_SHIFT) | ((address >> 16) & 0xff));
+
+    set_input();
+
+    while ((rdval = *gpread) & LE32(1 << PIN_TXN)) asm volatile("yield");
+//    gpio_rdval = LE32(rdval);
+
+    address += 4;
+    data.lo = (uint64_t)read_ps_reg(REG_DATA_HI) << 48;
+    data.lo |= (uint64_t)read_ps_reg(REG_DATA_LO) << 32;
+    slot_active[next_slot] = 0;
+    next_slot = (next_slot + 1) & 1;
+
+    set_output();
+    write_ps_reg(REG_SLOT, next_slot);
+    //if (slot_active[next_slot])
+    //{
+    //    while ((rdval = *gpread) & LE32(1 << PIN_TXN)) asm volatile("yield");
+    //    gpio_rdval = LE32(rdval);
+    //}
+
+    write_ps_reg(REG_ADDR_LO, address & 0xffff);
+    write_ps_reg(REG_ADDR_HI, TXN_READ | (g_fc << TXN_FC_SHIFT) | (SIZE_LONG << TXN_SIZE_SHIFT) | ((address >> 16) & 0xff));
+
+    set_input();
+
+    while ((rdval = *gpread) & LE32(1 << PIN_TXN)) asm volatile("yield");
+//    gpio_rdval = LE32(rdval);
+
+    data.lo |= (uint64_t)read_ps_reg(REG_DATA_HI) << 16;
+    data.lo |= (uint64_t)read_ps_reg(REG_DATA_LO);
+
+    slot_active[next_slot] = 0;
+    next_slot = (next_slot + 1) & 1;
+
+//    __atomic_clear(&gpio_lock, __ATOMIC_RELEASE);
+
+    return data;
+}
+
+static uint write_pending = 0;
+
+static inline void do_write_access(unsigned int address, unsigned int data, unsigned int size)
+{
+    uint32_t rdval = 0;
+
+//    while(__atomic_test_and_set(&gpio_lock, __ATOMIC_ACQUIRE)) asm volatile("yield");
+
+    set_output();
+
+    write_ps_reg(REG_DATA_LO, data & 0xffff);
+    if (size == SIZE_LONG)
+        write_ps_reg(REG_DATA_HI, (data >> 16) & 0xffff);
+
+    write_ps_reg(REG_ADDR_LO, address & 0xffff);
+
+    if (write_pending) while ((rdval = *gpread) & LE32(1 << PIN_TXN)) {}
+//    gpio_rdval = LE32(rdval);
+
+    write_ps_reg(REG_ADDR_HI, TXN_WRITE | (g_fc << TXN_FC_SHIFT) | (size << TXN_SIZE_SHIFT) | ((address >> 16) & 0xff));
+
+    set_input();
+
+    if (address > 0x00200000)
+    {
+        while ((rdval = *gpread) & LE32(1 << PIN_TXN)) {}
+//        gpio_rdval = LE32(rdval);
+
+        write_pending = 0;
+    }
+    else
+        write_pending = 1;
+    
+//    __atomic_clear(&gpio_lock, __ATOMIC_RELEASE);
+}
+
+static inline void do_write_access_64(unsigned int address, uint64_t data)
+{
+    uint32_t rdval = 0;
+
+//    while(__atomic_test_and_set(&gpio_lock, __ATOMIC_ACQUIRE)) asm volatile("yield");
+
+    set_output();
+
+    /* Set first long word to write */
+    write_ps_reg(REG_DATA_LO, (data >> 32) & 0xffff);
+    write_ps_reg(REG_DATA_HI, (data >> 48) & 0xffff);
+
+    /* Set address and start transaction */
+    write_ps_reg(REG_ADDR_LO, address & 0xffff);
+
+    if (write_pending) while ((rdval = *gpread) & LE32(1 << PIN_TXN)) {}
+//    gpio_rdval = LE32(rdval);
+
+    write_ps_reg(REG_ADDR_HI, TXN_WRITE | (g_fc << TXN_FC_SHIFT) | (SIZE_LONG << TXN_SIZE_SHIFT) | ((address >> 16) & 0xff));
+
+    /* Advance the address, set second long word to write */
+    address += 4;
+
+    /* Wait for completion of first transfer */
+    while ((rdval = *gpread) & LE32(1 << PIN_TXN)) {}
+//    gpio_rdval = LE32(rdval);
+
+    /* Set second long word to write */
+    write_ps_reg(REG_DATA_LO, (data) & 0xffff);
+    write_ps_reg(REG_DATA_HI, (data >> 16) & 0xffff);
+
+    /* Set address */
+    write_ps_reg(REG_ADDR_LO, address & 0xffff);
+   
+    /* Start second transaction */
+    write_ps_reg(REG_ADDR_HI, TXN_WRITE | (g_fc << TXN_FC_SHIFT) | (SIZE_LONG << TXN_SIZE_SHIFT) | ((address >> 16) & 0xff));
+
+    set_input();
+
+    if (address > 0x00200000)
+    {
+        while ((rdval = *gpread) & LE32(1 << PIN_TXN)) {}
+//        gpio_rdval = LE32(rdval);
+
+        write_pending = 0;
+    }
+    else
+        write_pending = 1;
+    
+//    __atomic_clear(&gpio_lock, __ATOMIC_RELEASE);
+}
+
+static inline void do_write_access_128(unsigned int address, uint128_t data)
+{
+    uint32_t rdval = 0;
+
+//    while(__atomic_test_and_set(&gpio_lock, __ATOMIC_ACQUIRE)) asm volatile("yield");
+
+    set_output();
+
+    /* Set first long word to write */
+    write_ps_reg(REG_DATA_LO, (data.hi >> 32) & 0xffff);
+    write_ps_reg(REG_DATA_HI, (data.hi >> 48) & 0xffff);
+
+    /* Set address and start transaction */
+    write_ps_reg(REG_ADDR_LO, address & 0xffff);
+
+    if (write_pending) while ((rdval = *gpread) & LE32(1 << PIN_TXN)) {}
+//    gpio_rdval = LE32(rdval);
+
+    write_ps_reg(REG_ADDR_HI, TXN_WRITE | (g_fc << TXN_FC_SHIFT) | (SIZE_LONG << TXN_SIZE_SHIFT) | ((address >> 16) & 0xff));
+
+    /* Advance the address, set second long word to write */
+    address += 4;
+
+    /* Wait for completion of first transfer */
+    while ((rdval = *gpread) & LE32(1 << PIN_TXN)) {}
+//    gpio_rdval = LE32(rdval);
+
+    /* Set second long word to write */
+    write_ps_reg(REG_DATA_LO, (data.hi) & 0xffff);
+    write_ps_reg(REG_DATA_HI, (data.hi >> 16) & 0xffff);
+
+    /* Set address */
+    write_ps_reg(REG_ADDR_LO, address & 0xffff);
+    
+    /* Start second transaction */
+    write_ps_reg(REG_ADDR_HI, TXN_WRITE | (g_fc << TXN_FC_SHIFT) | (SIZE_LONG << TXN_SIZE_SHIFT) | ((address >> 16) & 0xff));
+
+    address += 4;
+
+    /* Wait for completion of second transfer */
+    while ((rdval = *gpread) & LE32(1 << PIN_TXN)) {}
+//    gpio_rdval = LE32(rdval);
+
+    /* Set third long word to write */
+    write_ps_reg(REG_DATA_LO, (data.lo >> 32) & 0xffff);
+    write_ps_reg(REG_DATA_HI, (data.lo >> 48) & 0xffff);
+
+    /* Set address */
+    write_ps_reg(REG_ADDR_LO, address & 0xffff);
+    
+    /* Start third transaction */
+    write_ps_reg(REG_ADDR_HI, TXN_WRITE | (g_fc << TXN_FC_SHIFT) | (SIZE_LONG << TXN_SIZE_SHIFT) | ((address >> 16) & 0xff));
+
+    address += 4;
+
+    /* Wait for completion of third transfer */
+    while ((rdval = *gpread) & LE32(1 << PIN_TXN)) {}
+//    gpio_rdval = LE32(rdval);
+
+    /* Set second long word to write */
+    write_ps_reg(REG_DATA_LO, (data.lo) & 0xffff);
+    write_ps_reg(REG_DATA_HI, (data.lo >> 16) & 0xffff);
+
+    /* Set address */
+    write_ps_reg(REG_ADDR_LO, address & 0xffff);
+    
+    /* Start fourth transaction */
+    write_ps_reg(REG_ADDR_HI, TXN_WRITE | (g_fc << TXN_FC_SHIFT) | (SIZE_LONG << TXN_SIZE_SHIFT) | ((address >> 16) & 0xff));
+
+    set_input();
+
+    if (address > 0x00200000)
+    {
+        while ((rdval = *gpread) & LE32(1 << PIN_TXN)) {}
+//        gpio_rdval = LE32(rdval);
+
+        write_pending = 0;
+    }
+    else
+        write_pending = 1;
+
+//    __atomic_clear(&gpio_lock, __ATOMIC_RELEASE);
+}
+
+static inline int do_read_access(unsigned int address, unsigned int size)
+{
+    uint32_t rdval = 0;
+
+//    while(__atomic_test_and_set(&gpio_lock, __ATOMIC_ACQUIRE)) asm volatile("yield");
+
+    set_output();
+
+    write_ps_reg(REG_ADDR_LO, address & 0xffff);
+
+    if (write_pending) while ((rdval = *gpread) & LE32(1 << PIN_TXN)) {}
+//    gpio_rdval = LE32(rdval);
+
+    write_ps_reg(REG_ADDR_HI, TXN_READ | (g_fc << TXN_FC_SHIFT) | (size << TXN_SIZE_SHIFT) | ((address >> 16) & 0xff));
+
+    set_input();
+    unsigned int data;
+
+//    while ((rdval = *gpread) & LE32(1 << PIN_TXN)) {}
+//    gpio_rdval = LE32(rdval);
+
+    data = read_ps_reg_with_wait(REG_DATA_LO);
+    if (size == SIZE_BYTE)
+        data &= 0xff;
+    else if (size == SIZE_LONG)
+        data |= read_ps_reg(REG_DATA_HI) << 16;
+
+    write_pending = 0;
+
+//    __atomic_clear(&gpio_lock, __ATOMIC_RELEASE);
+
+    return data;
+}
+
+static inline uint64_t do_read_access_64(unsigned int address)
+{
+    uint32_t rdval = 0;
+    uint64_t data;
+
+//    while(__atomic_test_and_set(&gpio_lock, __ATOMIC_ACQUIRE)) asm volatile("yield");
+
+    set_output();
+
+    write_ps_reg(REG_ADDR_LO, address & 0xffff);
+
+    if (write_pending) while ((rdval = *gpread) & LE32(1 << PIN_TXN)) {}
+//    gpio_rdval = LE32(rdval);
+
+    write_ps_reg(REG_ADDR_HI, TXN_READ | (g_fc << TXN_FC_SHIFT) | (SIZE_LONG << TXN_SIZE_SHIFT) | ((address >> 16) & 0xff));
+
+    set_input();
+
+//    while ((rdval = *gpread) & LE32(1 << PIN_TXN)) {}
+//    gpio_rdval = LE32(rdval);
+
+    address += 4;
+    data = (uint64_t)read_ps_reg_with_wait(REG_DATA_HI) << 48;
+    data |= (uint64_t)read_ps_reg(REG_DATA_LO) << 32;
+
+    set_output();
+
+    write_ps_reg(REG_ADDR_LO, address & 0xffff);
+    write_ps_reg(REG_ADDR_HI, TXN_READ | (g_fc << TXN_FC_SHIFT) | (SIZE_LONG << TXN_SIZE_SHIFT) | ((address >> 16) & 0xff));
+
+    set_input();
+
+//    while ((rdval = *gpread) & LE32(1 << PIN_TXN)) {}
+//    gpio_rdval = LE32(rdval);
+
+    data |= (uint64_t)read_ps_reg_with_wait(REG_DATA_HI) << 16;
+    data |= (uint64_t)read_ps_reg(REG_DATA_LO);
+
+    write_pending = 0;
+
+//    __atomic_clear(&gpio_lock, __ATOMIC_RELEASE);
+
+    return data;
+}
+
+static inline uint128_t do_read_access_128(unsigned int address)
+{
+    uint32_t rdval = 0;
+    uint128_t data;
+
+//    while(__atomic_test_and_set(&gpio_lock, __ATOMIC_ACQUIRE)) asm volatile("yield");
+
+    set_output();
+
+    write_ps_reg(REG_ADDR_LO, address & 0xffff);
+    
+    if (write_pending) while ((rdval = *gpread) & LE32(1 << PIN_TXN)) {}
+//    gpio_rdval = LE32(rdval);
+
+    write_ps_reg(REG_ADDR_HI, TXN_READ | (g_fc << TXN_FC_SHIFT) | (SIZE_LONG << TXN_SIZE_SHIFT) | ((address >> 16) & 0xff));
+
+    set_input();
+
+//    while ((rdval = *gpread) & LE32(1 << PIN_TXN)) {}
+//    gpio_rdval = LE32(rdval);
+
+    address += 4;
+    data.hi = (uint64_t)read_ps_reg_with_wait(REG_DATA_HI) << 48;
+    data.hi |= (uint64_t)read_ps_reg(REG_DATA_LO) << 32;
+
+    set_output();
+
+    write_ps_reg(REG_ADDR_LO, address & 0xffff);
+    write_ps_reg(REG_ADDR_HI, TXN_READ | (g_fc << TXN_FC_SHIFT) | (SIZE_LONG << TXN_SIZE_SHIFT) | ((address >> 16) & 0xff));
+
+    set_input();
+
+//    while ((rdval = *gpread) & LE32(1 << PIN_TXN)) {}
+//    gpio_rdval = LE32(rdval);
+
+    address += 4;
+    data.hi |= (uint64_t)read_ps_reg_with_wait(REG_DATA_HI) << 16;
+    data.hi |= (uint64_t)read_ps_reg(REG_DATA_LO);
+
+    set_output();
+
+    write_ps_reg(REG_ADDR_LO, address & 0xffff);
+    write_ps_reg(REG_ADDR_HI, TXN_READ | (g_fc << TXN_FC_SHIFT) | (SIZE_LONG << TXN_SIZE_SHIFT) | ((address >> 16) & 0xff));
+
+    set_input();
+
+//    while ((rdval = *gpread) & LE32(1 << PIN_TXN)) {}
+//    gpio_rdval = LE32(rdval);
+
+    address += 4;
+    data.lo = (uint64_t)read_ps_reg_with_wait(REG_DATA_HI) << 48;
+    data.lo |= (uint64_t)read_ps_reg(REG_DATA_LO) << 32;
+
+    set_output();
+
+    write_ps_reg(REG_ADDR_LO, address & 0xffff);
+    write_ps_reg(REG_ADDR_HI, TXN_READ | (g_fc << TXN_FC_SHIFT) | (SIZE_LONG << TXN_SIZE_SHIFT) | ((address >> 16) & 0xff));
+
+    set_input();
+
+//    while ((rdval = *gpread) & LE32(1 << PIN_TXN)) {}
+//    gpio_rdval = LE32(rdval);
+
+    data.lo |= (uint64_t)read_ps_reg_with_wait(REG_DATA_HI) << 16;
+    data.lo |= (uint64_t)read_ps_reg(REG_DATA_LO);
+
+    write_pending = 0;
+
+//    __atomic_clear(&gpio_lock, __ATOMIC_RELEASE);
+
+    return data;
+}
+
+int (*read_access)(unsigned int address, unsigned int size);
+uint64_t (*read_access_64)(unsigned int address);
+uint128_t (*read_access_128)(unsigned int address);
+void (*write_access)(unsigned int address, unsigned int data, unsigned int size);
+void (*write_access_64)(unsigned int address, uint64_t data);
+void (*write_access_128)(unsigned int address, uint128_t data);
+
+void ps_setup_protocol()
+{
+    if (use_2slot)
+    {
+        kprintf("[PS32] Setting up two-slot protocol\n");
+        
+        read_access = do_read_access_2s;
+        read_access_64 = do_read_access_64_2s;
+        read_access_128 = do_read_access_128_2s;
+
+        write_access = do_write_access_2s;
+        write_access_64 = do_write_access_64_2s;
+        write_access_128 = do_write_access_128_2s;
+    }
+    else
+    {
+        kprintf("[PS32] Setting up protocol\n");
+
+        read_access = do_read_access;
+        read_access_64 = do_read_access_64;
+        read_access_128 = do_read_access_128;
+
+        write_access = do_write_access;
+        write_access_64 = do_write_access_64;
+        write_access_128 = do_write_access_128;
+    }
+
+//    __atomic_clear(&gpio_lock, __ATOMIC_RELEASE);
+
+    pistorm_setup_io();
+    pistorm_setup_serial();
+
+    *gpreset = LE32(CLEAR_BITS);
+
+    set_input();
+}
+
+
+unsigned int caddress;
+union {
+    uint32_t u32;
+    uint16_t u16[2];
+    uint8_t  u8[4];
+} cdata;
+union {
+    uint32_t u32;
+    uint16_t u16[2];
+    uint8_t  u8[4];
+} cmask;
+
+void flush_cdata()
+{
+    if (cmask.u32 == 0xffffffff)
+    {
+        write_access(caddress, cdata.u32, SIZE_LONG);
+    }
+    else
+    {
+        if (cmask.u16[0] == 0xffff)
+        {
+            write_access(caddress, cdata.u16[0], SIZE_WORD);
+            cmask.u16[0] = 0;
+        }
+        if (cmask.u16[1] == 0xffff)
+        {
+            write_access(caddress + 2, cdata.u16[1], SIZE_WORD);
+            cmask.u16[1] = 0;
+        }
+
+        if (cmask.u32)
+        {
+            for (int i=0; i < 4; i++)
+            {
+                if (cmask.u8[i]) {
+                    write_access(caddress + i, cdata.u8[i], SIZE_BYTE);
+                }
+            }
+        }
+    }
+
+    caddress = 0xffffffff;
+    cmask.u32 = 0;
+}
+
+#define SLOW_IO(address) ((address) >= 0xDFF09A && (address) < 0xDFF09E)
+
+static inline void check_blit_active(unsigned int addr, unsigned int size) {
+    if (!(__m68k_state->JIT_CONTROL2 & JC2F_BLITWAIT))
+        return;
+
+    const uint32_t bstart = 0xDFF040;   // BLTCON0
+    const uint32_t bend = 0xDFF076;     // BLTADAT+2
+    if (addr >= bend || addr + size <= bstart)
+        return;
+
+    const uint16_t mask = 1<<14 | 1<<9 | 1<<6; // BBUSY | DMAEN | BLTEN
+    while ((read_access(0xdff002, SIZE_WORD) & mask) == mask) {
+        // Dummy reads to not steal too many cycles from the blitter.
+        // But don't use e.g. CIA reads as we expect the operation
+        // to finish soon.
+        read_access(0x00f00000, SIZE_BYTE);
+        read_access(0x00f00000, SIZE_BYTE);
+    }
+}
+
 void ps_write_8(unsigned int address, unsigned int data) {
-    do_write_access(address, data, SIZE_BYTE);
+    write_access(address, data, SIZE_BYTE);
+    if (SLOW_IO(address))
+    {
+        read_access(0x00f00000, SIZE_BYTE);
+    }
+    cache_invalidate_range(ICACHE, address, 1);
 }
 
 void ps_write_16(unsigned int address, unsigned int data) {
-    do_write_access(address, data, SIZE_WORD);
+    check_blit_active(address, 2);
+    write_access(address, data, SIZE_WORD);
+    if (SLOW_IO(address))
+    {
+        read_access(0x00f00000, SIZE_BYTE);
+    }
+    cache_invalidate_range(ICACHE, address, 2);
 }
 
 void ps_write_32(unsigned int address, unsigned int data) {
-    do_write_access(address, data, SIZE_LONG);
+    check_blit_active(address, 4);
+    write_access(address, data, SIZE_LONG);
+    if (SLOW_IO(address))
+    {
+        read_access(0x00f00000, SIZE_BYTE);
+    }
+    cache_invalidate_range(ICACHE, address, 4);
+}
+
+void ps_write_64(unsigned int address, uint64_t data) {
+    check_blit_active(address, 8);
+    write_access_64(address, data);
+    if (SLOW_IO(address))
+    {
+        read_access(0x00f00000, SIZE_BYTE);
+    }
+    cache_invalidate_range(ICACHE, address, 8);
+}
+
+void ps_write_128(unsigned int address, uint128_t data) {
+    check_blit_active(address, 16);
+    write_access_128(address, data);
+    if (SLOW_IO(address))
+    {
+        read_access(0x00f00000, SIZE_BYTE);
+    }
+    cache_invalidate_range(ICACHE, address, 16);
 }
 
 unsigned int ps_read_8(unsigned int address) {
-    return do_read_access(address, SIZE_BYTE);
+    return read_access(address, SIZE_BYTE);
 }
 
 unsigned int ps_read_16(unsigned int address) {
-    return do_read_access(address, SIZE_WORD);
+    return read_access(address, SIZE_WORD);
 }
 
 unsigned int ps_read_32(unsigned int address) {
-    return do_read_access(address, SIZE_LONG);
+    return read_access(address, SIZE_LONG);
+}
+
+uint64_t ps_read_64(unsigned int address) {
+    return read_access_64(address);
+}
+
+uint128_t ps_read_128(unsigned int address) {
+    return read_access_128(address);
 }
 
 void ps_reset_state_machine() {
@@ -360,6 +1266,9 @@ void ps_pulse_reset()
 
     kprintf("[PS32] Clear DRIVE_RESET\n");
     ps_clr_control(CONTROL_DRIVE_RESET);
+
+    if (use_2slot)
+        ps_set_control(CONTROL_INC_EXEC_SLOT);
 
     overlay = 1;
     board = &__boards_start;
@@ -394,7 +1303,7 @@ void ps_efinix_setup()
 
     //reset fpga, latching cbus and mode pins
     *(gpio + 10) = LE32((1 << PIN_CRESET1) | (1 << PIN_CRESET2));
-    usleep(10000); //wait a bit for ps32-lite glitch filter RC to discharge
+    usleep(50000); //wait a bit for ps32-lite glitch filter RC to discharge
     *(gpio + 7) = LE32((1 << PIN_CRESET1) | (1 << PIN_CRESET2));
 }
 
@@ -406,12 +1315,15 @@ void ps_efinix_write(unsigned char data_out)
     {
         *(gpio + 10) = LE32(1 << PIN_CCK);
         *(gpio + 10) = LE32(1 << PIN_CCK);
+        *(gpio + 10) = LE32(1 << PIN_CCK);
         if (data_out & mask) *(gpio + 7) = LE32(1 << PIN_CDI0);
         else *(gpio + 10) = LE32(1 << PIN_CDI0);
         *(gpio + 7) = LE32(1 << PIN_CCK);
         *(gpio + 7) = LE32(1 << PIN_CCK);
+        *(gpio + 7) = LE32(1 << PIN_CCK);
         *(gpio + 7) = LE32(1 << PIN_CCK); //to get closer to 50/50 duty cycle
     }
+    *(gpio + 10) = LE32(1 << PIN_CCK);
     *(gpio + 10) = LE32(1 << PIN_CCK);
     *(gpio + 10) = LE32(1 << PIN_CCK);
 }
@@ -526,7 +1438,9 @@ void fastSerial_putByte_pi4(uint8_t byte)
     /* Clock down */
     *(gpio + 10) = LE32(1 << SER_OUT_CLK);
     *(gpio + 10) = LE32(1 << SER_OUT_CLK);
+    *(gpio + 10) = LE32(1 << SER_OUT_CLK);
     /* Clock up */
+    *(gpio + 7) = LE32(1 << SER_OUT_CLK);
     *(gpio + 7) = LE32(1 << SER_OUT_CLK);
     *(gpio + 7) = LE32(1 << SER_OUT_CLK);
 
@@ -539,7 +1453,9 @@ void fastSerial_putByte_pi4(uint8_t byte)
         /* Clock down */
         *(gpio + 10) = LE32(1 << SER_OUT_CLK);
         *(gpio + 10) = LE32(1 << SER_OUT_CLK);
+        *(gpio + 10) = LE32(1 << SER_OUT_CLK);
         /* Clock up */
+        *(gpio + 7) = LE32(1 << SER_OUT_CLK);
         *(gpio + 7) = LE32(1 << SER_OUT_CLK);
         *(gpio + 7) = LE32(1 << SER_OUT_CLK);
         
@@ -552,7 +1468,9 @@ void fastSerial_putByte_pi4(uint8_t byte)
     /* Clock down */
     *(gpio + 10) = LE32(1 << SER_OUT_CLK);
     *(gpio + 10) = LE32(1 << SER_OUT_CLK);
+    *(gpio + 10) = LE32(1 << SER_OUT_CLK);
     /* Clock up */
+    *(gpio + 7) = LE32(1 << SER_OUT_CLK);
     *(gpio + 7) = LE32(1 << SER_OUT_CLK);
     *(gpio + 7) = LE32(1 << SER_OUT_CLK);
 
@@ -574,7 +1492,9 @@ void fastSerial_reset()
         /* Clock down */
         *(gpio + 10) = LE32(1 << SER_OUT_CLK);
         *(gpio + 10) = LE32(1 << SER_OUT_CLK);
+        *(gpio + 10) = LE32(1 << SER_OUT_CLK);
         /* Clock up */
+        *(gpio + 7) = LE32(1 << SER_OUT_CLK);
         *(gpio + 7) = LE32(1 << SER_OUT_CLK);
         *(gpio + 7) = LE32(1 << SER_OUT_CLK);
     }
@@ -606,7 +1526,9 @@ void fastSerial_init()
 
     if (!gpio)
         gpio = ((volatile unsigned *)BCM2708_PERI_BASE) + GPIO_ADDR / 4;
-  
+
+    pistorm_setup_serial();
+
     asm volatile("mrs %0, CNTFRQ_EL0":"=r"(tmp));
 
     if (tmp > 20000000)
@@ -628,7 +1550,6 @@ void fastSerial_init()
 #define PM_RSTC_FULLRST 0x00000020
 
 volatile int housekeeper_enabled = 0;
-extern struct M68KState *__m68k_state;
 
 void ps_housekeeper() 
 {
@@ -648,21 +1569,54 @@ void ps_housekeeper()
     /* Configure timer-based event stream */
     /* Enable timer regs from EL0, enable event stream on posedge, monitor 2th bit */
     /* This gives a frequency of 2.4MHz for a 19.2MHz timer */
-    asm volatile("msr CNTKCTL_EL1, %0"::"r"(3 | (1 << 2) | (3 << 8) | (2 << 4)));
+    uint64_t tmp;
+    asm volatile("mrs %0, CNTFRQ_EL0":"=r"(tmp));
 
+    if (tmp > 20000000)
+    {
+        asm volatile("msr CNTKCTL_EL1, %0"::"r"(3 | (1 << 2) | (3 << 8) | (3 << 4)));
+    }
+    else
+    {
+        asm volatile("msr CNTKCTL_EL1, %0"::"r"(3 | (1 << 2) | (3 << 8) | (2 << 4)));
+    }
+
+    uint8_t pin_prev = LE32(*gpread);
+    
     for(;;) {
         if (housekeeper_enabled)
         {
-            uint32_t pin = LE32(*(gpio + 13));
-            __m68k_state->INT.IPL = ~pin & 7;
+            //if (!__atomic_test_and_set(&gpio_lock, __ATOMIC_ACQUIRE))
+            //{
+            //    gpio_rdval = LE32(*gpread);
+            //    __atomic_clear(&gpio_lock, __ATOMIC_RELEASE);
+            //}
 
-            asm volatile("":::"memory");
+            uint32_t pin = LE32(*gpread);
 
-            if (__m68k_state->INT.IPL)
-                asm volatile("sev":::"memory");
+            // Reall 680x0 CPU filters IPL lines in order to avoid false interrupts if
+            // there is a clock skew between three IPL bits. We need to do the same.
+            // Update IPL if and only if two subsequent IPL reads are the same.
+            if ((pin & 7) == (pin_prev & 7))
+            {
+                __m68k_state->INT.IPL = ~pin & 7;
+
+                asm volatile("":::"memory");
+
+                if (__m68k_state->INT.IPL)
+                    asm volatile("sev":::"memory");
+            }
+
+            pin_prev = pin;
 
             if ((pin & (1 << PIN_KBRESET)) == 0) {
                 kprintf("[HKEEP] Houskeeper will reset RasPi now...\n");
+
+                ps_set_control(CONTROL_REQ_BM);
+                usleep(100000);
+
+                ps_set_control(CONTROL_DRIVE_RESET);
+                usleep(150000);
 
                 unsigned int r;
                 // trigger a restart by instructing the GPU to boot from partition 0
@@ -769,7 +1723,7 @@ void ps_buptest(unsigned int test_size, unsigned int maxiter)
         }
 
         for (uint32_t i = 1; i < (test_size) - 2; i += 2) {
-            uint32_t c = BE16((ps_read_8(i) << 8) | ps_read_8(i + 1));
+            uint32_t c = BE16(ps_read_16(i));
             if (c != *((uint16_t *)&garbage[i])) {
                 kprintf_pc(__putc, NULL, "\n    READ16_ODD: Garbege data mismatch at $%.6X: %.4X should be %.4X.\n", i, c, *((uint16_t *)&garbage[i]));
                 while(1);
@@ -791,9 +1745,7 @@ void ps_buptest(unsigned int test_size, unsigned int maxiter)
         }
 
         for (uint32_t i = 1; i < (test_size) - 4; i += 2) {
-            uint32_t c = ps_read_8(i) << 24;
-            c |= (BE16(ps_read_16(i + 1)) << 8);
-            c |= ps_read_8(i + 3);
+            uint32_t c = BE32(ps_read_32(i));
             if (c != *((uint32_t *)&garbage[i])) {
                 kprintf_pc(__putc, NULL, "\n    READ32_ODD: Garbege data mismatch at $%.6X: %.8X should be %.8X.\n", i, c, *((uint32_t *)&garbage[i]));
                 while(1);
@@ -858,6 +1810,27 @@ void ps_buptest(unsigned int test_size, unsigned int maxiter)
             if ((i % (frac * 2)) == 1)
                 kprintf_pc(__putc, NULL, "*");
         }
+
+        kprintf_pc(__putc, NULL, "\n  Writing QUAD garbage data to Chip... ");
+        for (uint32_t i = 0; i < (test_size) - 8; i += 8) {
+            uint64_t v = *((uint64_t *)&garbage[i]);
+            ps_write_64(i , v);
+
+            if ((i % (frac * 2)) == 1)
+                kprintf_pc(__putc, NULL, "*");
+        }
+
+        for (uint32_t i = 1; i < (test_size) - 16; i += 8) {
+            uint64_t c = ps_read_64(i);
+            if (c != *((uint64_t *)&garbage[i])) {
+                kprintf_pc(__putc, NULL, "\n    READ64_ODD: Garbege data mismatch at $%.6X: %.16X should be %.16X.\n", i, c, *((uint64_t *)&garbage[i]));
+                while(1);
+            }
+
+            if ((i % (frac * 2)) == 1)
+                kprintf_pc(__putc, NULL, "*");
+        }
+
 
         kprintf_pc(__putc, NULL, "\n");
     }

@@ -10,11 +10,12 @@
 #include "support.h"
 #include "M68k.h"
 #include "RegisterAllocator.h"
+#include "cache.h"
 
 uint32_t *EMIT_moveq(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
     uint8_t update_mask = M68K_GetSRMask(*m68k_ptr);
-    uint16_t opcode = BE16((*m68k_ptr)[0]);
+    uint16_t opcode = cache_read_16(ICACHE, (uintptr_t)&(*m68k_ptr)[0]);
     int8_t value = opcode & 0xff;
     uint8_t reg = (opcode >> 9) & 7;
     uint8_t tmp_reg = RA_MapM68kRegisterForWrite(&ptr, reg);
@@ -41,7 +42,10 @@ uint32_t *EMIT_moveq(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed
     if (update_mask)
     {
         uint8_t cc = RA_ModifyCC(&ptr);
-        ptr = EMIT_ClearFlags(ptr, cc, update_mask);
+        uint8_t alt_mask = update_mask;
+        if ((alt_mask & 3) != 0 && (alt_mask & 3) < 3)
+            alt_mask ^= 3;
+        ptr = EMIT_ClearFlags(ptr, cc, alt_mask);
         if (value <= 0) {
             if (value < 0)
                 ptr = EMIT_SetFlags(ptr, cc, SR_N);
@@ -68,7 +72,8 @@ uint32_t GetSR_Line7(uint16_t opcode)
 uint32_t *EMIT_move(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
     uint8_t update_mask = M68K_GetSRMask(*m68k_ptr);
-    uint16_t opcode = BE16((*m68k_ptr)[0]);
+    uint16_t opcode = cache_read_16(ICACHE, (uintptr_t)&(*m68k_ptr)[0]);
+    int move_length = M68K_GetINSNLength(*m68k_ptr);
     uint8_t ext_count = 0;
     uint8_t tmp_reg = 0xff;
     uint8_t size = 1;
@@ -79,6 +84,7 @@ uint32_t *EMIT_move(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed)
     int loaded_in_dest = 0;
     *insn_consumed = 1;
     int done = 0;
+    int fused_opcodes = 0;
 
     // Move from/to An in byte size is illegal
     if ((opcode & 0xf000) == 0x1000)
@@ -136,7 +142,7 @@ uint32_t *EMIT_move(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed)
     if ((opcode & 0xf000) == 0x2000)
     {
         // Fetch 2nd opcode just now
-        uint16_t opcode2 = BE16((*m68k_ptr)[1]);
+        uint16_t opcode2 = cache_read_16(ICACHE, (uintptr_t)&(*m68k_ptr)[1]);
 
         // Is move.l Reg, -(An) ?: Dest mode 100, source mode 000 or 001
         if ((opcode & 0x01f0) == 0x0100)
@@ -229,34 +235,38 @@ uint32_t *EMIT_move(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed)
                 uint8_t dst_reg_2 = RA_MapM68kRegisterForWrite(&ptr, ((opcode2 >> 9) & 0x7) + ((opcode2 >> 3) & 8));
                 uint8_t is_movea2 = (opcode2 & 0x01c0) == 0x0040;
 
-                /* Allow merging if two dest registers differ */
-                if (dst_reg_1 != dst_reg_2)
+                /* merging not allowed if any of the registers stored is also address register */
+                if (!(dst_reg_1 == addr_reg || dst_reg_2 == addr_reg))
                 {
-                    /* Two subsequent register moves from (An)+ */
-                    (*m68k_ptr)+=2;
-                    
-                    *ptr++ = ldp_postindex(addr_reg, dst_reg_1, dst_reg_2, 8);
+                    /* Allow merging if two dest registers differ */
+                    if (dst_reg_1 != dst_reg_2)
+                    {
+                        /* Two subsequent register moves from (An)+ */
+                        (*m68k_ptr)+=2;
+                        
+                        *ptr++ = ldp_postindex(addr_reg, dst_reg_1, dst_reg_2, 8);
 
-                    if (!is_movea2) {
-                        update_mask = M68K_GetSRMask(*m68k_ptr - 1);
+                        if (!is_movea2) {
+                            update_mask = M68K_GetSRMask(*m68k_ptr - 1);
+                                if (update_mask) {
+                                *ptr++ = cmn_reg(31, dst_reg_2, LSL, 0);
+                                tmp_reg = dst_reg_2;
+                            }
+                        }
+                        else if (!is_movea) {
                             if (update_mask) {
-                            *ptr++ = cmn_reg(31, dst_reg_2, LSL, 0);
-                            tmp_reg = dst_reg_2;
+                                *ptr++ = cmn_reg(31, dst_reg_1, LSL, 0);
+                                tmp_reg = dst_reg_1;
+                            }
                         }
-                    }
-                    else if (!is_movea) {
-                        if (update_mask) {
-                            *ptr++ = cmn_reg(31, dst_reg_1, LSL, 0);
-                            tmp_reg = dst_reg_1;
-                        }
-                    }
 
-                    is_movea = is_movea && is_movea2;
-                            
-                    done = 1;
-                    ptr = EMIT_AdvancePC(ptr, 4);
-                    *insn_consumed = 2;
-                    size = 4;
+                        is_movea = is_movea && is_movea2;
+                                
+                        done = 1;
+                        ptr = EMIT_AdvancePC(ptr, 4);
+                        *insn_consumed = 2;
+                        size = 4;
+                    }
                 }
             }
         }
@@ -276,42 +286,47 @@ uint32_t *EMIT_move(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed)
                 uint8_t dst_reg_2 = RA_MapM68kRegisterForWrite(&ptr, ((opcode2 >> 9) & 0x7) + ((opcode2 >> 3) & 8));
                 uint8_t is_movea2 = (opcode2 & 0x01c0) == 0x0040;
 
-                /* Allow merging if two dest registers differ */
-                if (dst_reg_1 != dst_reg_2)
+                /* merging not allowed if any of the registers stored is also address register */
+                if (!(dst_reg_1 == addr_reg || dst_reg_2 == addr_reg))
                 {
-                    /* Two subsequent register moves to (An)+ */
-                    (*m68k_ptr)+=2;
+                    /* Allow merging if two dest registers differ */
+                    if (dst_reg_1 != dst_reg_2)
+                    {
+                        /* Two subsequent register moves to (An)+ */
+                        (*m68k_ptr)+=2;
 
-                    *ptr++ = ldp_preindex(addr_reg, dst_reg_2, dst_reg_1, -8);
+                        *ptr++ = ldp_preindex(addr_reg, dst_reg_2, dst_reg_1, -8);
 
-                    if (!is_movea2) {
-                        update_mask = M68K_GetSRMask(*m68k_ptr - 1);
+                        if (!is_movea2) {
+                            update_mask = M68K_GetSRMask(*m68k_ptr - 1);
+                                if (update_mask) {
+                                *ptr++ = cmn_reg(31, dst_reg_2, LSL, 0);
+                                tmp_reg = dst_reg_2;
+                            }
+                        }
+                        else if (!is_movea) {
                             if (update_mask) {
-                            *ptr++ = cmn_reg(31, dst_reg_2, LSL, 0);
-                            tmp_reg = dst_reg_2;
+                                *ptr++ = cmn_reg(31, dst_reg_1, LSL, 0);
+                                tmp_reg = dst_reg_1;
+                            }
                         }
-                    }
-                    else if (!is_movea) {
-                        if (update_mask) {
-                            *ptr++ = cmn_reg(31, dst_reg_1, LSL, 0);
-                            tmp_reg = dst_reg_1;
-                        }
-                    }
 
-                    is_movea = is_movea && is_movea2;
-                
-                    done = 1;
-                    ptr = EMIT_AdvancePC(ptr, 4);
-                    *insn_consumed = 2;
-                    size = 4;
+                        is_movea = is_movea && is_movea2;
+                    
+                        done = 1;
+                        ptr = EMIT_AdvancePC(ptr, 4);
+                        *insn_consumed = 2;
+                        size = 4;
+                    }
                 }
             }
         }
     }
 
-
     if (!done)
     {
+        int sign_ext = 0;
+
         /* Reverse destination mode, since this one is reversed in MOVE instruction */
         tmp = (opcode >> 6) & 0x3f;
         tmp = ((tmp & 7) << 3) | (tmp >> 3);
@@ -325,15 +340,51 @@ uint32_t *EMIT_move(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed)
         else
             size = 2;
 
+        /* Only if target is data register */
+        if ((tmp & 0x38) == 0)
+        {
+            uint16_t opcode2 = cache_read_16(ICACHE, (uintptr_t)&(*m68k_ptr)[move_length - 1]);
+            
+            /* Check if subsequent instruction is extb.l on the same target reg */
+            if (size == 1 && (opcode2 & 0xfff8) == 0x49c0 && (opcode2 & 7) == (tmp & 7))
+            {
+                sign_ext = 1;
+                fused_opcodes = 1;
+                (*insn_consumed)++;
+            }
+            /* Check if subsequent instruction is ext.l (word->long) on same target and size is word */
+            else if (size == 2 && (opcode2 & 0xfff8) == 0x48c0 && (opcode2 & 7) == (tmp & 7))
+            {
+                sign_ext = 1;
+                fused_opcodes = 1;
+                (*insn_consumed)++;
+            }
+            /* Check if subsequent instructions are ext.w + ext.l on the same target and size is byte */
+            else if (size == 1 && (opcode2 & 0xfff8) == 0x4880 && (opcode2 & 7) == (tmp & 7))
+            {
+                uint16_t opcode3 = cache_read_16(ICACHE, (uintptr_t)&(*m68k_ptr)[move_length]);
+                if ((opcode3 & 0xfff8) == 0x48c0 && (opcode3 & 7) == (tmp & 7))
+                {
+                    sign_ext = 1;
+                    fused_opcodes = 2;
+                    *insn_consumed+=2;
+                }
+            }
+
+        }
+
         /* Copy 32bit from data reg to data reg */
-        if (size == 4)
+        if (size == 4 || sign_ext)
         {
             /* If source was not a register (this is handled separately), but target is a register */
             if ((opcode & 0x38) != 0 && (opcode & 0x38) != 0x08) {
                 if ((tmp & 0x38) == 0) {
                     loaded_in_dest = 1;
                     tmp_reg = RA_MapM68kRegisterForWrite(&ptr, tmp & 7);
-                    ptr = EMIT_LoadFromEffectiveAddress(ptr, size, &tmp_reg, opcode & 0x3f, *m68k_ptr, &ext_count, 0, NULL);
+                    if (sign_ext)
+                        ptr = EMIT_LoadFromEffectiveAddress(ptr, 0x80 | size, &tmp_reg, opcode & 0x3f, *m68k_ptr, &ext_count, 0, NULL);
+                    else
+                        ptr = EMIT_LoadFromEffectiveAddress(ptr, size, &tmp_reg, opcode & 0x3f, *m68k_ptr, &ext_count, 0, NULL);
                 }
                 else if ((tmp & 0x38) == 0x08) {
                     loaded_in_dest = 1;
@@ -342,21 +393,6 @@ uint32_t *EMIT_move(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed)
                 }
             }
         }
-#if 0
-        if ((tmp & 0x38) == 0 && size == 4)
-        {
-            loaded_in_dest = 1;
-            tmp_reg = RA_MapM68kRegisterForWrite(&ptr, tmp & 7);
-            ptr = EMIT_LoadFromEffectiveAddress(ptr, size, &tmp_reg, opcode & 0x3f, *m68k_ptr, &ext_count, 0, NULL);
-        }
-        else if ((tmp & 0x38) == 0x08)
-        {
-            loaded_in_dest = 1;
-            tmp_reg = RA_MapM68kRegisterForWrite(&ptr, 8 + (tmp & 7));
-            ptr = EMIT_LoadFromEffectiveAddress(ptr, size, &tmp_reg, opcode & 0x3f, *m68k_ptr, &ext_count, 0, NULL);
-        }
-        else
-#endif
         if (!loaded_in_dest)
         {
             if (is_movea && size == 2) {
@@ -370,7 +406,17 @@ uint32_t *EMIT_move(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed)
                 ptr = EMIT_LoadFromEffectiveAddress(ptr, 0x80 | size, &tmp_reg, opcode & 0x3f, *m68k_ptr, &ext_count, 0, NULL);
             }
             else {
-                ptr = EMIT_LoadFromEffectiveAddress(ptr, size, &tmp_reg, opcode & 0x3f, *m68k_ptr, &ext_count, 1, NULL);
+                /* No need to check if target is register if sign_ext is active */
+                if (sign_ext)
+                {
+                    tmp_reg = RA_MapM68kRegisterForWrite(&ptr, tmp & 7);
+                    loaded_in_dest = 1;
+                    ptr = EMIT_LoadFromEffectiveAddress(ptr, 0x80 | size, &tmp_reg, opcode & 0x3f, *m68k_ptr, &ext_count, 1, NULL);
+                }
+                else
+                {
+                    ptr = EMIT_LoadFromEffectiveAddress(ptr, size, &tmp_reg, opcode & 0x3f, *m68k_ptr, &ext_count, 1, NULL);
+                }
             }
         }
 
@@ -378,10 +424,10 @@ uint32_t *EMIT_move(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed)
             is_load_immediate = 1;
             switch (size) {
                 case 4:
-                    immediate_value = BE32(*(uint32_t*)(*m68k_ptr));
+                    immediate_value = cache_read_32(ICACHE, (uintptr_t)&(*(uint32_t*)(*m68k_ptr)));
                     break;
                 case 2:
-                    immediate_value = BE16(**m68k_ptr);
+                    immediate_value = cache_read_16(ICACHE, (uintptr_t)&(**m68k_ptr));
                     break;
                 case 1:
                     immediate_value = ((uint8_t*)*m68k_ptr)[1];
@@ -394,12 +440,26 @@ uint32_t *EMIT_move(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed)
             size = 4;
         }
 
+        /* If opcodes were fused, make a size of 4 and reload SR mask **past** the fused stuff */
+        if (fused_opcodes)
+        {
+            size = 4;
+            update_mask = M68K_GetSRMask(*m68k_ptr + ext_count + fused_opcodes - 1);
+        }
+
         if (update_mask && !is_load_immediate)
         {
             switch (size)
             {
                 case 4:
-                    *ptr++ = cmn_reg(31, tmp_reg, LSL, 0);
+                    if (!loaded_in_dest && (tmp & 0x38) == 0)
+                    {
+                        uint8_t dst_reg = RA_MapM68kRegisterForWrite(&ptr, tmp & 7);
+                        *ptr++ = adds_reg(dst_reg, 31, tmp_reg, LSL, 0);
+                        loaded_in_dest = 1;
+                    }
+                    else
+                        *ptr++ = cmn_reg(31, tmp_reg, LSL, 0);
                     break;
                 case 2:
                     *ptr++ = cmn_reg(31, tmp_reg, LSL, 16);
@@ -411,11 +471,11 @@ uint32_t *EMIT_move(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed)
         }
 
         if (!loaded_in_dest)
-            ptr = EMIT_StoreToEffectiveAddress(ptr, size, &tmp_reg, tmp, *m68k_ptr, &ext_count);
+            ptr = EMIT_StoreToEffectiveAddress(ptr, size, &tmp_reg, tmp, *m68k_ptr, &ext_count, 0);
 
-        ptr = EMIT_AdvancePC(ptr, 2 * (ext_count + 1));
+        ptr = EMIT_AdvancePC(ptr, 2 * (ext_count + 1 + fused_opcodes));
 
-        (*m68k_ptr) += ext_count;
+        (*m68k_ptr) += ext_count + fused_opcodes;
     }
 
     if (!is_movea)
@@ -426,7 +486,10 @@ uint32_t *EMIT_move(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 
             if (is_load_immediate) {
                 int32_t tmp_immediate = 0;
-                ptr = EMIT_ClearFlags(ptr, cc, update_mask);
+                uint8_t alt_mask = update_mask;
+                if ((alt_mask & 3) != 0 && (alt_mask & 3) < 3)
+                    alt_mask ^= 3;
+                ptr = EMIT_ClearFlags(ptr, cc, alt_mask);
                 switch (size)
                 {
                     case 4:

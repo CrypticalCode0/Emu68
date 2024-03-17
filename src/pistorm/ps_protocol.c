@@ -15,6 +15,7 @@
 #include "tlsf.h"
 #include "ps_protocol.h"
 #include "M68k.h"
+#include "cache.h"
 
 volatile unsigned int *gpio;
 volatile unsigned int *gpclk;
@@ -505,16 +506,12 @@ static void ps_write_32_int(unsigned int address, unsigned int value)
     }
 }
 
-unsigned int ps_read_16_int(unsigned int address)
+static unsigned int ps_read_16_int_nowbwait(unsigned int address)
 {
     uint64_t tmp;
     asm volatile("mrs %0, CNTFRQ_EL0":"=r"(tmp));
 
-#if PISTORM_WRITE_BUFFER
-    wb_waitfree();
-#endif
-
-address &= 0xffffff;
+    address &= 0xffffff;
 
 //    if (address > 0xffffff)
 //        return 0xffff;
@@ -585,6 +582,14 @@ address &= 0xffffff;
         *(gpio + 10) = LE32(0xffffec);
         return (value >> 8) & 0xffff;
     }
+}
+
+unsigned int ps_read_16_int(unsigned int address)
+{
+#if PISTORM_WRITE_BUFFER
+    wb_waitfree();
+#endif
+    return ps_read_16_int_nowbwait(address);
 }
 
 unsigned int ps_read_8_int(unsigned int address)
@@ -800,7 +805,17 @@ void ps_housekeeper()
     /* Configure timer-based event stream */
     /* Enable timer regs from EL0, enable event stream on posedge, monitor 2th bit */
     /* This gives a frequency of 2.4MHz for a 19.2MHz timer */
-    asm volatile("msr CNTKCTL_EL1, %0"::"r"(3 | (1 << 2) | (3 << 8) | (2 << 4)));
+    uint64_t tmp;
+    asm volatile("mrs %0, CNTFRQ_EL0":"=r"(tmp));
+
+    if (tmp > 20000000)
+    {
+        asm volatile("msr CNTKCTL_EL1, %0"::"r"(3 | (1 << 2) | (3 << 8) | (3 << 4)));
+    }
+    else
+    {
+        asm volatile("msr CNTKCTL_EL1, %0"::"r"(3 | (1 << 2) | (3 << 8) | (2 << 4)));
+    }
 
     for(;;) {
         if (housekeeper_enabled)
@@ -913,6 +928,28 @@ void wb_init()
 #endif
 }
 
+static inline void check_blit_active(unsigned int addr, unsigned int size)
+{
+    if (!__m68k_state || !(__m68k_state->JIT_CONTROL2 & JC2F_BLITWAIT))
+        return;
+
+    addr &= 0xffffff;
+
+    const uint32_t bstart = 0xDFF040;   // BLTCON0
+    const uint32_t bend = 0xDFF076;     // BLTADAT+2
+    if (addr >= bend || addr + size <= bstart)
+        return;
+
+    const uint16_t mask = 1<<14 | 1<<9 | 1<<6; // BBUSY | DMAEN | BLTEN
+    while ((ps_read_16_int_nowbwait(0xdff002) & mask) == mask) {
+        // Dummy reads to not steal too many cycles from the blitter.
+        // But don't use e.g. CIA reads as we expect the operation
+        // to finish soon.
+        ps_read_16_int_nowbwait(0x00f00000);
+        ps_read_16_int_nowbwait(0x00f00000);
+    }
+}
+
 void wb_task()
 {
 #if PISTORM_WRITE_BUFFER
@@ -922,6 +959,8 @@ void wb_task()
         struct WriteRequest req = wb_peek();
 
         while(__atomic_test_and_set(&bus_lock, __ATOMIC_ACQUIRE)) { asm volatile("yield"); }
+
+        check_blit_active(req.wr_addr, req.wr_size);
 
         switch (req.wr_size) {
             case 1:
@@ -977,6 +1016,7 @@ void ps_write_8(unsigned int address, unsigned int data)
     }
 #endif
 #endif
+    cache_invalidate_range(ICACHE, address, 1);
 }
 
 void ps_write_16(unsigned int address, unsigned int data)
@@ -991,6 +1031,7 @@ void ps_write_16(unsigned int address, unsigned int data)
         wb_waitfree();
     }
 #else
+    check_blit_active(address, 2);
     ps_write_16_int(address, data);
 #if CIA_DELAY
     if (address >= 0xbf0000 && address <= 0xbfffff) {
@@ -1003,6 +1044,7 @@ void ps_write_16(unsigned int address, unsigned int data)
     }
 #endif
 #endif
+    cache_invalidate_range(ICACHE, address, 2);
 }
 
 void ps_write_32(unsigned int address, unsigned int data)
@@ -1017,6 +1059,7 @@ void ps_write_32(unsigned int address, unsigned int data)
         wb_waitfree();
     }
 #else
+    check_blit_active(address, 4);
     ps_write_32_int(address, data);
 #if CIA_DELAY
     if (address >= 0xbf0000 && address <= 0xbfffff) {
@@ -1029,6 +1072,23 @@ void ps_write_32(unsigned int address, unsigned int data)
     }
 #endif
 #endif
+    cache_invalidate_range(ICACHE, address, 4);
+}
+
+void ps_write_64(unsigned int address, uint64_t data)
+{
+    ps_write_32(address, data >> 32);
+    ps_write_32(address + 4, data & 0xffffffff);
+    cache_invalidate_range(ICACHE, address, 8);
+}
+
+void ps_write_128(unsigned int address, uint128_t data)
+{
+    ps_write_32(address, data.hi >> 32);
+    ps_write_32(address + 4, data.hi & 0xffffffff);
+    ps_write_32(address + 8, data.lo >> 32);
+    ps_write_32(address + 12, data.lo & 0xffffffff);
+    cache_invalidate_range(ICACHE, address, 16);
 }
 
 unsigned int ps_read_8(unsigned int address)
@@ -1080,11 +1140,41 @@ unsigned int ps_read_32(unsigned int address)
     return val;
 }
 
+uint64_t ps_read_64(unsigned int address)
+{
+    uint32_t hi, lo;
+
+    hi = ps_read_32(address);
+    lo = ps_read_32(address + 4);
+
+    return ((uint64_t)hi << 32) | lo;
+}
+
+uint128_t ps_read_128(unsigned int address)
+{
+    uint128_t res;
+    uint32_t hi, lo;
+
+    hi = ps_read_32(address);
+    lo = ps_read_32(address + 4);
+
+    res.hi = ((uint64_t)hi << 32) | lo;
+
+    hi = ps_read_32(address + 8);
+    lo = ps_read_32(address + 12);
+
+    res.lo = ((uint64_t)hi << 32) | lo;
+
+    return res;
+}
+
 void put_char(uint8_t c);
+void putByte(void *io_base, char chr);
 
 static void __putc(void *data, char c)
 {
     (void)data;
+    putByte(data, c);
     put_char(c);
 }
 

@@ -10,6 +10,7 @@
 #include "support.h"
 #include "M68k.h"
 #include "EmuFeatures.h"
+#include "cache.h"
 
 uint8_t SR_GetEALength(uint16_t *insn_stream, uint8_t ea, uint8_t imm_size)
 {
@@ -27,7 +28,7 @@ uint8_t SR_GetEALength(uint16_t *insn_stream, uint8_t ea, uint8_t imm_size)
         else if (mode == 6 || (mode == 7 && reg == 3))
         {
             /* Reg- or PC-relative addressing mode */
-            uint16_t brief = BE16(insn_stream[0]);
+            uint16_t brief = cache_read_16(ICACHE, (uint32_t)(uintptr_t)&insn_stream[0]);
 
             /* Brief word is here */
             word_count++;
@@ -96,7 +97,7 @@ uint8_t SR_GetEALength(uint16_t *insn_stream, uint8_t ea, uint8_t imm_size)
 /* Check if opcode is of branch kind or may result in a */
 int M68K_IsBranch(uint16_t *insn_stream)
 {
-    uint16_t opcode = BE16(*insn_stream);
+    uint16_t opcode = cache_read_16(ICACHE, (uint32_t)(uintptr_t)&insn_stream[0]);
 
     if (
         opcode == 0x007c            ||
@@ -127,7 +128,7 @@ int M68K_IsBranch(uint16_t *insn_stream)
 
 int M68K_GetMoveLength(uint16_t *insn_stream)
 {
-    uint16_t opcode = BE16(*insn_stream);
+    uint16_t opcode = cache_read_16(ICACHE, (uint32_t)(uintptr_t)&insn_stream[0]);
     int size = 0;
     int length = 1;
     uint8_t ea = opcode & 0x3f;
@@ -151,8 +152,8 @@ int M68K_GetMoveLength(uint16_t *insn_stream)
 
 int M68K_GetLineFLength(uint16_t *insn_stream)
 {
-    uint16_t opcode = BE16(insn_stream[0]);
-    uint16_t opcode2 = BE16(insn_stream[1]);
+    uint16_t opcode = cache_read_16(ICACHE, (uint32_t)(uintptr_t)&insn_stream[0]);
+    uint16_t opcode2 = cache_read_16(ICACHE, (uint32_t)(uintptr_t)&insn_stream[1]);;
     int length = 1;
     int need_ea = 0;
     int opsize = 0;
@@ -770,7 +771,7 @@ int M68K_GetLineFLength(uint16_t *insn_stream)
 /* Get number of 16-bit words this instruction occupies */
 int M68K_GetINSNLength(uint16_t *insn_stream)
 {
-    uint16_t opcode = *insn_stream;
+    uint16_t opcode = cache_read_16(ICACHE, (uint32_t)(uintptr_t)&insn_stream[0]);
     int length = 0;
 
     switch(opcode & 0xf000)
@@ -855,12 +856,14 @@ static SR_Check SRCheck[16] = {
     GetSR_def
 };
 
+extern struct M68KState *__m68k_state;
+
 /* Get the mask of status flags changed by the instruction specified by the opcode */
 uint8_t M68K_GetSRMask(uint16_t *insn_stream)
 {
-    uint16_t opcode = BE16(*insn_stream);
+    uint16_t opcode = cache_read_16(ICACHE, (uint32_t)(uintptr_t)insn_stream);
     int scan_depth = 0;
-    const int max_scan_depth = 20;
+    const int max_scan_depth = (__m68k_state->JIT_CONTROL2 >> JC2B_CCR_SCAN_DEPTH) & JC2_CCR_SCAN_MASK;
     uint8_t mask = 0;
     uint8_t needed = 0;
     uint8_t tmp_sets = 0;
@@ -893,11 +896,11 @@ uint8_t M68K_GetSRMask(uint16_t *insn_stream)
                 int32_t branch_offset = (int8_t)(opcode & 0xff);
 
                 if ((opcode & 0xff) == 0) {
-                    branch_offset = (int16_t)BE16(insn_stream[1]);
+                    branch_offset = (int16_t)cache_read_16(ICACHE, (uint32_t)(uintptr_t)&insn_stream[1]);
                 } else if ((opcode & 0xff) == 0xff) {
                     uint16_t lo16, hi16;
-                    hi16 = BE16(insn_stream[1]);
-                    lo16 = BE16(insn_stream[2]);
+                    hi16 = cache_read_16(ICACHE, (uint32_t)(uintptr_t)&insn_stream[1]);
+                    lo16 = cache_read_16(ICACHE, (uint32_t)(uintptr_t)&insn_stream[2]);
                     branch_offset = lo16 | (hi16 << 16);
                 }
 
@@ -910,11 +913,11 @@ uint8_t M68K_GetSRMask(uint16_t *insn_stream)
             {
                 if (opcode & 1) {
                     uint16_t lo16, hi16;
-                    hi16 = BE16(insn_stream[1]);
-                    lo16 = BE16(insn_stream[2]);
+                    hi16 = cache_read_16(ICACHE, (uint32_t)(uintptr_t)&insn_stream[1]);
+                    lo16 = cache_read_16(ICACHE, (uint32_t)(uintptr_t)&insn_stream[2]);
                     insn_stream = (uint16_t*)(uintptr_t)(lo16 | (hi16 << 16));
                 } else {
-                    insn_stream = (uint16_t*)(uintptr_t)((uint32_t)BE16(insn_stream[1]));
+                    insn_stream = (uint16_t*)(uintptr_t)((uint32_t)cache_read_16(ICACHE, (uint32_t)(uintptr_t)&insn_stream[1]));
                 }
 
                 D(kprintf("[JIT]   %02d: Absolute jump to %08x\n", scan_depth, insn_stream));
@@ -928,12 +931,12 @@ uint8_t M68K_GetSRMask(uint16_t *insn_stream)
                 needed |= mask & (SRCheck[opcode >> 12](opcode) >> 16);
 
                 if ((opcode & 0xff) == 0) {
-                    branch_offset = (int16_t)BE16(insn_stream[1]);
+                    branch_offset = (int16_t)cache_read_16(ICACHE, (uint32_t)(uintptr_t)&insn_stream[1]);
                     insn_stream_2++;
                 } else if ((opcode & 0xff) == 0xff) {
                     uint16_t lo16, hi16;
-                    hi16 = BE16(insn_stream[1]);
-                    lo16 = BE16(insn_stream[2]);
+                    hi16 = cache_read_16(ICACHE, (uint32_t)(uintptr_t)&insn_stream[1]);
+                    lo16 = cache_read_16(ICACHE, (uint32_t)(uintptr_t)&insn_stream[2]);
                     branch_offset = lo16 | (hi16 << 16);
                     insn_stream_2+=2;
                 }
@@ -957,7 +960,7 @@ uint8_t M68K_GetSRMask(uint16_t *insn_stream)
                         break;
 
                     /* Get opcode */
-                    opcode = BE16(*insn_stream);
+                    opcode = cache_read_16(ICACHE, (uint32_t)(uintptr_t)insn_stream);
 
                     D(kprintf("[JIT]   %02d.1: opcode=%04x @ %08x ", scan_depth, opcode, insn_stream));
 
@@ -994,7 +997,7 @@ uint8_t M68K_GetSRMask(uint16_t *insn_stream)
                         break;
 
                     /* Get opcode */
-                    opcode = BE16(*insn_stream_2);
+                    opcode = cache_read_16(ICACHE, (uint32_t)(uintptr_t)insn_stream_2);
 
                     D(kprintf("[JIT]   %02d.2: opcode=%04x @ %08x ", scan_depth, opcode, insn_stream_2));
 
@@ -1037,7 +1040,7 @@ uint8_t M68K_GetSRMask(uint16_t *insn_stream)
         }
         
         /* Get opcode */
-        opcode = BE16(*insn_stream);
+        opcode = cache_read_16(ICACHE, (uint32_t)(uintptr_t)insn_stream);
         D(kprintf("[JIT]   %02d: opcode=%04x @ %08x ", scan_depth, opcode, insn_stream));
 
         uint32_t flags = SRCheck[opcode >> 12](opcode);

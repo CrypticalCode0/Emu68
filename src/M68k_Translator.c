@@ -18,6 +18,7 @@
 #include "config.h"
 #include "DuffCopy.h"
 #include "disasm.h"
+#include "cache.h"
 
 #if SET_FEATURES_AT_RUNTIME
 features_t Features;
@@ -111,7 +112,7 @@ uint32_t *EMIT_ResetOffsetPC(uint32_t *ptr)
 
 uint32_t *EMIT_lineA(uint32_t *arm_ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
-    uint16_t opcode = BE16((*m68k_ptr)[0]);
+    uint16_t opcode = cache_read_16(ICACHE, (uintptr_t)&(*m68k_ptr)[0]);
     (*m68k_ptr)++;
     (*insn_consumed)++;
 
@@ -143,13 +144,14 @@ static uint32_t * (*line_array[16])(uint32_t *arm_ptr, uint16_t **m68k_ptr, uint
     EMIT_lineF
 };
 
+extern struct M68KState *__m68k_state;
+
 static inline uint32_t *EmitINSN(uint32_t *arm_ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
     uint32_t *ptr = arm_ptr;
-    uint16_t opcode = BE16((*m68k_ptr)[0]);
+    uint16_t opcode = cache_read_16(ICACHE, (uint32_t)(uintptr_t)*m68k_ptr);
     uint8_t group = opcode >> 12;
 
-#ifdef __aarch64__
     if (debug > 2)
     {
         *ptr++ = hint(0);
@@ -166,7 +168,18 @@ static inline uint32_t *EmitINSN(uint32_t *arm_ptr, uint16_t **m68k_ptr, uint16_
         *ptr++ = msr(reg, 3, 3, 9, 12, 4);
         RA_FreeARMRegister(&ptr, reg);
     }
-#endif
+
+    if ((__m68k_state->JIT_CONTROL2 & JC2F_CHIP_SLOWDOWN) && (uintptr_t)*m68k_ptr < 0x200000)
+    {
+        static uint32_t counter;
+        const uint32_t repeat_every = 1 + ((__m68k_state->JIT_CONTROL2 >> JC2B_CHIP_SLOWDOWN_RATIO) & JC2_CHIP_SLOWDOWN_RATIO_MASK);
+        if (counter++ % repeat_every == 0)
+        {
+            int8_t off = 0;
+            ptr = EMIT_GetOffsetPC(ptr, &off);
+            *ptr++ = ldurh_offset(REG_PC, 0, off);
+        }
+    }
 
     ptr = line_array[group](ptr, m68k_ptr, insn_consumed);
 
@@ -228,7 +241,6 @@ uint32_t prologue_size = 0;
 uint32_t epilogue_size = 0;
 uint32_t conditionals_count = 0;
 
-extern struct M68KState *__m68k_state;
 void M68K_PrintContext(void *);
 
 
@@ -241,8 +253,47 @@ uint8_t reg_Load96;
 uint8_t reg_Save96;
 uint32_t val_FPIAR;
 
+uint32_t * EMIT_LocalExit(uint32_t *ptr, uint32_t insn_fixup)
+{
+    RA_StoreDirtyFPURegs(&ptr);
+    RA_StoreDirtyM68kRegs(&ptr);
+    ptr = EMIT_FlushPC(ptr);
+
+    RA_StoreCC(&ptr);
+    RA_StoreFPCR(&ptr);
+    RA_StoreFPSR(&ptr);
+
+#if EMU68_INSN_COUNTER
+    uint32_t insn_count_local = insn_count + insn_fixup;
+    uint8_t tmp = RA_AllocARMRegister(&ptr);
+    *ptr++ = mov_immed_u16(tmp, insn_count_local & 0xffff, 0);
+    if (insn_count & 0xffff0000) {
+        *ptr++ = movk_immed_u16(tmp, insn_count_local >> 16, 1);
+    }
+    *ptr++ = fmov_from_reg(0, tmp);
+    *ptr++ = vadd_2d(30, 30, 0);
+    
+    if (val_FPIAR != 0xffffffff) {
+        *ptr++ = mov_immed_u16(tmp, val_FPIAR & 0xffff, 0);
+        *ptr++ = movk_immed_u16(tmp, val_FPIAR >> 16, 1);
+        *ptr++ = mov_reg_to_simd(29, TS_S, 1, tmp);
+    }
+
+    RA_FreeARMRegister(&ptr, tmp);
+#else
+    (void)insn_fixup;
+#endif
+
+    *ptr++ = bx_lr();
+
+    return ptr;
+}
+
+uint16_t * m68k_entry_point;
+
 static inline uintptr_t M68K_Translate(uint16_t *m68kcodeptr)
 {
+    m68k_entry_point = m68kcodeptr;
     uint16_t *orig_m68kcodeptr = m68kcodeptr;
     uintptr_t hash = (uintptr_t)m68kcodeptr;
     int var_EMU68_MAX_LOOP_COUNT = (__m68k_state->JIT_CONTROL >> JCCB_LOOP_COUNT) & JCCB_LOOP_COUNT_MASK;
@@ -251,8 +302,6 @@ static inline uintptr_t M68K_Translate(uint16_t *m68kcodeptr)
     uint32_t var_EMU68_M68K_INSN_DEPTH = (__m68k_state->JIT_CONTROL >> JCCB_INSN_DEPTH) & JCCB_INSN_DEPTH_MASK;
     if (var_EMU68_M68K_INSN_DEPTH == 0)
         var_EMU68_M68K_INSN_DEPTH = JCCB_INSN_DEPTH_MASK + 1;
-    uint32_t *pop_update_loc[var_EMU68_M68K_INSN_DEPTH];
-    uint32_t pop_cnt=0;
 
     uint16_t *last_rev_jump = (uint16_t *)0xffffffff;
 
@@ -278,9 +327,6 @@ static inline uintptr_t M68K_Translate(uint16_t *m68kcodeptr)
         disasm_open();
     }
 
-    for (unsigned i=0; i < var_EMU68_M68K_INSN_DEPTH; i++)
-        pop_update_loc[i] = (uint32_t *)0;
-
     M68K_ResetReturnStack();
 
     if (debug) {
@@ -305,17 +351,7 @@ static inline uintptr_t M68K_Translate(uint16_t *m68kcodeptr)
     RA_ClearChangedMask();
 
     uint32_t *tmpptr = end;
-    pop_update_loc[pop_cnt++] = end;
 
-#ifndef __aarch64__
-    *end++ = push(0); // Space for register saving, aarch32 only
-
-#if !(EMU68_HOST_BIG_ENDIAN) && EMU68_HAS_SETEND
-    *end++ = setend_be();
-#endif
-
-    *end++ = ldr_offset(REG_CTX, REG_PC, __builtin_offsetof(struct M68KState, PC));
-#else
     if (debug_cnt & 2)
     {
         uint8_t reg = RA_AllocARMRegister(&end);
@@ -323,7 +359,6 @@ static inline uintptr_t M68K_Translate(uint16_t *m68kcodeptr)
         *end++ = msr(reg, 3, 3, 9, 12, 4);
         RA_FreeARMRegister(&end, reg);
     }
-#endif
 
     prologue_size = end - tmpptr;
 
@@ -370,10 +405,7 @@ static inline uintptr_t M68K_Translate(uint16_t *m68kcodeptr)
         local_state[insn_count].mls_ARMOffset = end - arm_code;
         local_state[insn_count].mls_M68kPtr = m68kcodeptr;
         local_state[insn_count].mls_PCRel = _pc_rel;
-#ifndef __aarch64__
-        for (int r=0; r < 16; r++)
-            local_state[insn_count].mls_RegMap[r] = RA_GetMappedARMRegister(r);
-#endif
+
         end = EmitINSN(end, &m68kcodeptr, &insn_consumed);
         insn_count+=insn_consumed;
         if (end[-1] == INSN_TO_LE(0xfffffff0))
@@ -404,9 +436,7 @@ static inline uintptr_t M68K_Translate(uint16_t *m68kcodeptr)
             for (unsigned i=0; i < branch_cnt; i++)
             {
                 uintptr_t ptr = *(uint32_t *)--end;
-#ifdef __aarch64__
                 ptr |= (uintptr_t)end & 0xffffffff00000000;
-#endif
                 branch_mod[i] = (uint32_t *)ptr;
             }
 
@@ -416,84 +446,13 @@ static inline uintptr_t M68K_Translate(uint16_t *m68kcodeptr)
 
             if (!local_branch_done)
             {
-                RA_StoreDirtyFPURegs(&end);
-                RA_StoreDirtyM68kRegs(&end);
-                end = EMIT_FlushPC(end);
-#ifndef __aarch64__
-                RA_StoreCC(&end);
-                RA_StoreFPCR(&end);
-                RA_StoreFPSR(&end);
-
-                *end++ = str_offset(REG_CTX, REG_PC, __builtin_offsetof(struct M68KState, PC));
-#if !(EMU68_HOST_BIG_ENDIAN) && EMU68_HAS_SETEND
-                *end++ = setend_le();
-#endif
-
-#else
-                RA_StoreCC(&end);
-                RA_StoreFPCR(&end);
-                RA_StoreFPSR(&end);
-#endif
-#ifndef __aarch64__
-                pop_update_loc[pop_cnt++] = end;
-                *end++ = pop((1 << REG_SR));// | (1 << REG_CTX));
-                if (!lr_is_saved)
-                    *end++ = bx_lr();
-#else
-
-#if EMU68_INSN_COUNTER
-
-#if 0
-                uint8_t ctx_free = 0;
-                uint8_t ctx = RA_TryCTX(&end);
-                uint8_t tmp = RA_AllocARMRegister(&end);
-                if (ctx == 0xff)
-                {
-                    ctx = RA_AllocARMRegister(&end);
-                    *end++ = mrs(ctx, 3, 3, 13, 0, 3);
-                    ctx_free = 1;
-                }
-                *end++ = ldr64_offset(ctx, tmp, __builtin_offsetof(struct M68KState, INSN_COUNT));
-                *end++ = add64_immed(tmp, tmp, insn_count & 0xfff);
-                if (insn_count & 0xfff000)
-                    *end++ = adds64_immed_lsl12(tmp, tmp, insn_count >> 12);
-                *end++ = str64_offset(ctx, tmp, __builtin_offsetof(struct M68KState, INSN_COUNT));
-
-                RA_FreeARMRegister(&end, tmp);
-                if (ctx_free)
-                    RA_FreeARMRegister(&end, ctx);
-#else
-                uint8_t tmp = RA_AllocARMRegister(&end);
-                *end++ = mov_immed_u16(tmp, insn_count & 0xffff, 0);
-                if (insn_count & 0xffff0000) {
-                    *end++ = movk_immed_u16(tmp, insn_count >> 16, 1);
-                }
-                *end++ = fmov_from_reg(0, tmp);
-                *end++ = vadd_2d(30, 30, 0);
-                
-                if (val_FPIAR != 0xffffffff) {
-                    *end++ = mov_immed_u16(tmp, val_FPIAR & 0xffff, 0);
-                    *end++ = movk_immed_u16(tmp, val_FPIAR >> 16, 1);
-                    *end++ = mov_reg_to_simd(29, TS_S, 1, tmp);
-                }
-
-                RA_FreeARMRegister(&end, tmp);
-#endif
-
-#endif
-                pop_update_loc[pop_cnt++] = end;
-                *end++ = bx_lr();
-#endif
+                end = EMIT_LocalExit(end, 0);
             }
             int distance = end - tmpptr;
 
             for (unsigned i=0; i < branch_cnt; i++) {
                 //kprintf("[ICache] Branch modification at %p : distance increase by %d\n", (void*) branch_mod[i], distance);
-#ifdef __aarch64__
                 *(branch_mod[i]) = INSN_TO_LE((INSN_TO_LE(*(branch_mod[i])) + (distance << 5)));
-#else
-                *(branch_mod[i]) = INSN_TO_LE((INSN_TO_LE(*(branch_mod[i])) + distance));
-#endif
             }
             epilogue_size += distance;
         }
@@ -537,64 +496,10 @@ static inline uintptr_t M68K_Translate(uint16_t *m68kcodeptr)
     RA_FlushFPURegs(&end);
     RA_FlushM68kRegs(&end);
     end = EMIT_FlushPC(end);
-#ifndef __aarch64__
     RA_FlushCC(&end);
     RA_FlushFPCR(&end);
     RA_FlushFPSR(&end);
-    *end++ = str_offset(REG_CTX, REG_PC, __builtin_offsetof(struct M68KState, PC));
-    uint16_t mask = RA_GetChangedMask() & 0xfff0;
-    if (RA_IsCCModified())
-        mask |= 1 << REG_SR;
-#if !(EMU68_HOST_BIG_ENDIAN) && EMU68_HAS_SETEND
-    *end++ = setend_le();
-#endif
-    if (!mask && !lr_is_saved)
-#else
-    RA_FlushCC(&end);
-    RA_FlushFPCR(&end);
-    RA_FlushFPSR(&end);
-#endif
-    {
-#ifndef __aarch64__
-        arm_code++;
-#endif
-        int i=1;
 
-        while (pop_update_loc[i]) {
-#ifdef __aarch64__
-            i++;
-#else
-            *pop_update_loc[i++] = bx_lr();
-#endif
-        }
-    }
-#ifndef __aarch64__
-    if (lr_is_saved)
-    {
-        *end++ = pop(mask /*| (1 << REG_SR)*/ /*| (1 << REG_CTX)*/ | (1 << 15));
-    }
-    else if (mask)
-    {
-        *end++ = pop(mask /*| (1 << REG_SR)*/ /*| (1 << REG_CTX)*/);
-    }
-
-    if (mask || lr_is_saved)
-    {
-        int i=1;
-        if (lr_is_saved)
-            *pop_update_loc[0] = push(mask /*| (1 << REG_SR)*/ /*| (1 << REG_CTX)*/ | (1 << 14));
-        else
-            *pop_update_loc[0] = push(mask /*| (1 << REG_SR)*/ /*| (1 << REG_CTX)*/);
-        while (pop_update_loc[i]) {
-            if (lr_is_saved)
-                *pop_update_loc[i++] = pop(mask /*| (1 << REG_SR)*/ /*| (1 << REG_CTX)*/ | (1 << 15));
-            else
-                *pop_update_loc[i++] = pop(mask /*| (1 << REG_SR)*/ /*| (1 << REG_CTX)*/);
-        }
-    }
-    if (!lr_is_saved)
-        *end++ = bx_lr();
-#else
     uint8_t tmp = RA_AllocARMRegister(&end);
     uint8_t tmp2 = RA_AllocARMRegister(&end);
     if (inner_loop)
@@ -607,13 +512,6 @@ static inline uintptr_t M68K_Translate(uint16_t *m68kcodeptr)
         *end++ = ldr_offset(ctx, tmp2, __builtin_offsetof(struct M68KState, INT));
     }
 #if EMU68_INSN_COUNTER
-#if 0
-    *end++ = ldr64_offset(ctx, tmp, __builtin_offsetof(struct M68KState, INSN_COUNT));
-    *end++ = add64_immed(tmp, tmp, insn_count & 0xfff);
-    if (insn_count & 0xfff000)
-        *end++ = adds64_immed_lsl12(tmp, tmp, insn_count >> 12);
-    *end++ = str64_offset(ctx, tmp, __builtin_offsetof(struct M68KState, INSN_COUNT));
-#else
     {
         uint8_t tmp = RA_AllocARMRegister(&end);
         *end++ = mov_immed_u16(tmp, insn_count & 0xffff, 0);
@@ -631,7 +529,6 @@ static inline uintptr_t M68K_Translate(uint16_t *m68kcodeptr)
 
         RA_FreeARMRegister(&end, tmp);
     }
-#endif
 #endif
     if (inner_loop)
     {
@@ -651,7 +548,6 @@ static inline uintptr_t M68K_Translate(uint16_t *m68kcodeptr)
     RA_FlushCTX(&end);
     end = _tmpptr;
     
-#endif
     epilogue_size += end - tmpptr;
 
     if (disasm) {

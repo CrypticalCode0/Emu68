@@ -10,6 +10,7 @@
 #include "support.h"
 #include "M68k.h"
 #include "RegisterAllocator.h"
+#include "cache.h"
 
 static uint32_t *EMIT_CMPA(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
 __attribute__((alias("EMIT_CMPA_reg")));
@@ -41,19 +42,19 @@ static uint32_t *EMIT_CMPA_ext(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_p
     {
         uint8_t cc = RA_ModifyCC(&ptr);
         
-        if (__builtin_popcount(update_mask) > 1)
-            ptr = EMIT_GetNZVnC(ptr, cc, &update_mask);
-        else
-            ptr = EMIT_ClearFlags(ptr, cc, update_mask);
-
-        if (update_mask & SR_Z)
-            ptr = EMIT_SetFlagsConditional(ptr, cc, SR_Z, ARM_CC_EQ);
-        if (update_mask & SR_N)
-            ptr = EMIT_SetFlagsConditional(ptr, cc, SR_N, ARM_CC_MI);
-        if (update_mask & SR_V)
-            ptr = EMIT_SetFlagsConditional(ptr, cc, SR_V, ARM_CC_VS);
-        if (update_mask & SR_C)
-            ptr = EMIT_SetFlagsConditional(ptr, cc, SR_C, ARM_CC_CC);
+        if (__builtin_popcount(update_mask) != 0)
+        {
+            ptr = EMIT_GetNZnCV(ptr, cc, &update_mask);
+            
+            if (update_mask & SR_Z)
+                ptr = EMIT_SetFlagsConditional(ptr, cc, SR_Z, ARM_CC_EQ);
+            if (update_mask & SR_N)
+                ptr = EMIT_SetFlagsConditional(ptr, cc, SR_N, ARM_CC_MI);
+            if (update_mask & SR_V)
+                ptr = EMIT_SetFlagsConditional(ptr, cc, SR_Valt, ARM_CC_VS);
+            if (update_mask & SR_C)
+                ptr = EMIT_SetFlagsConditional(ptr, cc, SR_Calt, ARM_CC_CC);
+        }
     }
 
     return ptr;
@@ -112,19 +113,19 @@ static uint32_t *EMIT_CMPM(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     {
         uint8_t cc = RA_ModifyCC(&ptr);
         
-        if (__builtin_popcount(update_mask) > 1)
-            ptr = EMIT_GetNZVnC(ptr, cc, &update_mask);
-        else
-            ptr = EMIT_ClearFlags(ptr, cc, update_mask);
-
-        if (update_mask & SR_Z)
-            ptr = EMIT_SetFlagsConditional(ptr, cc, SR_Z, ARM_CC_EQ);
-        if (update_mask & SR_N)
-            ptr = EMIT_SetFlagsConditional(ptr, cc, SR_N, ARM_CC_MI);
-        if (update_mask & SR_V)
-            ptr = EMIT_SetFlagsConditional(ptr, cc, SR_V, ARM_CC_VS);
-        if (update_mask & SR_C)
-            ptr = EMIT_SetFlagsConditional(ptr, cc, SR_C, ARM_CC_CC);
+        if (__builtin_popcount(update_mask) != 0)
+        {
+            ptr = EMIT_GetNZnCV(ptr, cc, &update_mask);
+            
+            if (update_mask & SR_Z)
+                ptr = EMIT_SetFlagsConditional(ptr, cc, SR_Z, ARM_CC_EQ);
+            if (update_mask & SR_N)
+                ptr = EMIT_SetFlagsConditional(ptr, cc, SR_N, ARM_CC_MI);
+            if (update_mask & SR_V)
+                ptr = EMIT_SetFlagsConditional(ptr, cc, SR_Valt, ARM_CC_VS);
+            if (update_mask & SR_C)
+                ptr = EMIT_SetFlagsConditional(ptr, cc, SR_Calt, ARM_CC_CC);
+        }
     }
 
     return ptr;
@@ -187,19 +188,19 @@ static uint32_t *EMIT_CMP_ext(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_pt
     {
         uint8_t cc = RA_ModifyCC(&ptr);
 
-        if (__builtin_popcount(update_mask) > 1)
-            ptr = EMIT_GetNZVnC(ptr, cc, &update_mask);
-        else
-            ptr = EMIT_ClearFlags(ptr, cc, update_mask);
-            
-        if (update_mask & SR_Z)
-            ptr = EMIT_SetFlagsConditional(ptr, cc, SR_Z, ARM_CC_EQ);
-        if (update_mask & SR_N)
-            ptr = EMIT_SetFlagsConditional(ptr, cc, SR_N, ARM_CC_MI);
-        if (update_mask & SR_V)
-            ptr = EMIT_SetFlagsConditional(ptr, cc, SR_V, ARM_CC_VS);
-        if (update_mask & SR_C)
-            ptr = EMIT_SetFlagsConditional(ptr, cc, SR_C, ARM_CC_CC);
+        if (__builtin_popcount(update_mask) != 0)
+        {
+            ptr = EMIT_GetNZnCV(ptr, cc, &update_mask);
+
+            if (update_mask & SR_Z)
+                ptr = EMIT_SetFlagsConditional(ptr, cc, SR_Z, ARM_CC_EQ);
+            if (update_mask & SR_N)
+                ptr = EMIT_SetFlagsConditional(ptr, cc, SR_N, ARM_CC_MI);
+            if (update_mask & SR_V)
+                ptr = EMIT_SetFlagsConditional(ptr, cc, SR_Valt, ARM_CC_VS);
+            if (update_mask & SR_C)
+                ptr = EMIT_SetFlagsConditional(ptr, cc, SR_Calt, ARM_CC_CC);
+        }
     }
 
     return ptr;
@@ -436,7 +437,7 @@ static struct OpcodeDef InsnTable[512] = {
 
 uint32_t *EMIT_lineB(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
-    uint16_t opcode = BE16((*m68k_ptr)[0]);
+    uint16_t opcode = cache_read_16(ICACHE, (uintptr_t)&(*m68k_ptr)[0]);
     (*m68k_ptr)++;
     *insn_consumed = 1;
 
@@ -477,7 +478,7 @@ uint32_t GetSR_LineB(uint16_t opcode)
 
 int M68K_GetLineBLength(uint16_t *insn_stream)
 {
-    uint16_t opcode = BE16(*insn_stream);
+    uint16_t opcode = cache_read_16(ICACHE, (uintptr_t)insn_stream);
     
     int length = 0;
     int need_ea = 0;

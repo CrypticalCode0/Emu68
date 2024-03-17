@@ -26,6 +26,8 @@
 #include "md5.h"
 #include "disasm.h"
 #include "version.h"
+#include "cache.h"
+#include "sponsoring.h"
 
 void _start();
 void _boot();
@@ -89,7 +91,7 @@ asm("   .section .startup           \n"
 "2:                                 \n"
 
 "       adrp    x16, mmu_user_L1    \n" /* x16 - address of user's L1 map */
-"       mov     x9, #" xstr(MMU_OSHARE|MMU_ACCESS|MMU_ATTR(2)|MMU_PAGE) "\n" /* initial setup: 1:1 uncached for first 4GB */
+"       mov     x9, #" xstr(MMU_OSHARE|MMU_ACCESS|MMU_ATTR_UNCACHED|MMU_PAGE) "\n" /* initial setup: 1:1 uncached for first 4GB */
 "       mov     x10, #0x40000000    \n"
 "       str     x9, [x16, #0]       \n"
 "       add     x9, x9, x10         \n"
@@ -105,7 +107,7 @@ asm("   .section .startup           \n"
 "       orr     x9, x17, #3         \n" /* valid + page table */
 "       str     x9, [x16]           \n" /* Entry 0 of the L1 kernel map points to L2 map now */
 
-"       mov     x9, #" xstr(MMU_ISHARE|MMU_ACCESS|MMU_ATTR(0)|MMU_PAGE) "\n" /* Prepare 1:1 cached map of the address space from 0x0 at 0xffffff9000000000 (first 320GB) */
+"       mov     x9, #" xstr(MMU_ISHARE|MMU_ACCESS|MMU_ATTR_CACHED|MMU_PAGE) "\n" /* Prepare 1:1 cached map of the address space from 0x0 at 0xffffff9000000000 (first 320GB) */
 "       mov     x18, 320            \n"
 "       add     x19, x16, #64*8     \n"
 "1:     str     x9, [x19], #8       \n"
@@ -115,7 +117,7 @@ asm("   .section .startup           \n"
 
 "       adrp    x16, _boot          \n" /* x16 - address of our kernel + offset */
 "       and     x16, x16, #~((1 << 21) - 1) \n" /* get the 2MB page */
-"       movk    x16, #" xstr(MMU_ISHARE|MMU_ACCESS|MMU_ATTR(0)|MMU_PAGE) "\n" /* set page attributes */
+"       movk    x16, #" xstr(MMU_ISHARE|MMU_ACCESS|MMU_ATTR_CACHED|MMU_PAGE) "\n" /* set page attributes */
 "       mov     x9, #" xstr(KERNEL_SYS_PAGES) "\n" /* Enable all pages used by the kernel */
 "1:     str     x16, [x17], #8      \n" /* Store pages in the L2 map */
 "       add     x16, x16, #0x200000 \n" /* Advance phys address by 2MB */
@@ -136,7 +138,7 @@ asm("   .section .startup           \n"
 "       isb     sy                  \n"
 
                                         /* Attr0 - write-back cacheable RAM, Attr1 - device, Attr2 - non-cacheable, Attr3 - write-through */
-"       ldr     x10, =" xstr(ATTR_CACHED | (ATTR_DEVICE_nGnRE << 8) | (ATTR_NOCACHE << 16) | (ATTR_WRTHROUGH << 24)) "\n"
+"       ldr     x10, =" xstr(MMU_ATTR_ENTRIES) "\n"
 "       msr     MAIR_EL1, x10       \n" /* Set memory attributes */
 
 "       ldr     x10, =0xb5193519    \n" /* Upper and lower enabled, both 39bit in size */
@@ -300,6 +302,15 @@ void __vectors_start(void);
 extern int debug_cnt;
 int enable_cache = 0;
 int limit_2g = 0;
+int chip_slowdown;
+int dbf_slowdown;
+int emu68_icnt = EMU68_M68K_INSN_DEPTH;
+int emu68_ccrd = EMU68_CCR_SCAN_DEPTH;
+int emu68_irng = EMU68_BRANCH_INLINE_DISTANCE;
+
+#ifdef PISTORM
+static int blitwait;
+#endif
 extern const char _verstring_object[];
 
 #ifdef PISTORM
@@ -362,7 +373,7 @@ asm(
 "       mov     x10, #0x00300000    \n" /* Enable signle and double VFP coprocessors in EL1 and EL0 */
 "       msr     CPACR_EL1, x10      \n"
                                         /* Attr0 - write-back cacheable RAM, Attr1 - device, Attr2 - non-cacheable */
-"       ldr     x10, =" xstr(ATTR_CACHED | (ATTR_DEVICE_nGnRE << 8) | (ATTR_NOCACHE << 16) | (ATTR_WRTHROUGH << 24)) "\n"
+"       ldr     x10, =" xstr(MMU_ATTR_ENTRIES) "\n"
 "       msr     MAIR_EL1, x10       \n" /* Set memory attributes */
 
 "       ldr     x10, =0xb5193519    \n" /* Upper and lower enabled, both 39bit in size */
@@ -509,6 +520,7 @@ static void my_free(void *ptr)
 
 void *firmware_file = NULL;
 uint32_t firmware_size = 0;
+uint32_t cs_dist = 1;
 
 void boot(void *dtree)
 {
@@ -561,6 +573,155 @@ void boot(void *dtree)
             if (find_token(prop->op_value, "limit_2g"))
                 limit_2g = 1;
 #ifdef PISTORM
+#ifdef PISTORM32LITE
+            if (find_token(prop->op_value, "two_slot"))
+            {
+                extern uint32_t use_2slot;
+                use_2slot = 1;
+            }
+            else if (find_token(prop->op_value, "one_slot"))
+            {
+                extern uint32_t use_2slot;
+                use_2slot = 0;
+            }
+#endif
+            if (find_token(prop->op_value, "chip_slowdown") || find_token(prop->op_value, "SC"))
+            {
+                chip_slowdown = 1;
+            }
+            else
+            {
+                chip_slowdown = 0;
+            }
+
+            if ((tok = find_token(prop->op_value, "cs_dist=")))
+            {
+                uint32_t cs = 0;
+
+                for (int i=0; i < 4; i++)
+                {
+                    if (tok[8 + i] < '0' || tok[8 + i] > '9')
+                        break;
+
+                    cs = cs * 10 + tok[8 + i] - '0';
+                }
+
+                if (cs == 0) cs = 1;
+
+                if (cs > 8) {
+                    cs = 8;
+                }
+                
+                cs_dist = cs;
+            }
+
+            if ((tok = find_token(prop->op_value, "SCS=")))
+            {
+                uint32_t cs = 0;
+
+                for (int i=0; i < 4; i++)
+                {
+                    if (tok[4 + i] < '0' || tok[4 + i] > '9')
+                        break;
+
+                    cs = cs * 10 + tok[4 + i] - '0';
+                }
+
+                if (cs == 0) cs = 1;
+
+                if (cs > 8) {
+                    cs = 8;
+                }
+                
+                cs_dist = cs;
+            }
+
+
+            if (find_token(prop->op_value, "dbf_slowdown") || find_token(prop->op_value, "DBF"))
+            {
+                dbf_slowdown = 1;
+            }
+            else
+            {
+                dbf_slowdown = 0;
+            }
+
+            blitwait = !(!find_token(prop->op_value, "blitwait") && !find_token(prop->op_value, "BW"));
+
+            if ((tok = find_token(prop->op_value, "ICNT=")))
+            {
+                uint32_t val = 0;
+                const char *c = &tok[5];
+
+                for (int i=0; i < 4; i++)
+                {
+                    if (c[i] < '0' || c[i] > '9')
+                        break;
+
+                    val = val * 10 + c[i] - '0';
+                }
+
+                if (val == 0) val = 1;
+                if (val > 256) val = 256;
+
+                emu68_icnt = val;
+            }
+
+            if ((tok = find_token(prop->op_value, "CCRD=")))
+            {
+                uint32_t val = 0;
+                const char *c = &tok[5];
+
+                for (int i=0; i < 4; i++)
+                {
+                    if (c[i] < '0' || c[i] > '9')
+                        break;
+
+                    val = val * 10 + c[i] - '0';
+                }
+
+                if (val > 31) val = 31;
+
+                emu68_ccrd = val;
+            }
+
+            if ((tok = find_token(prop->op_value, "IRNG=")))
+            {
+                uint32_t val = 0;
+                const char *c = &tok[5];
+
+                for (int i=0; i < 7; i++)
+                {
+                    if (c[i] < '0' || c[i] > '9')
+                        break;
+
+                    val = val * 10 + c[i] - '0';
+                }
+
+                if (val > 65535) val = 65535;
+
+                emu68_irng = val;
+            }
+
+            if ((tok = find_token(prop->op_value, "ICNT=")))
+            {
+                uint32_t val = 0;
+                const char *c = &tok[5];
+
+                for (int i=0; i < 4; i++)
+                {
+                    if (c[i] < '0' || c[i] > '9')
+                        break;
+
+                    val = val * 10 + c[i] - '0';
+                }
+
+                if (val == 0) val = 1;
+                if (val > 256) val = 256;
+
+                emu68_icnt = val;
+            }
+
             if ((tok = find_token(prop->op_value, "buptest=")))
             {
                 uint32_t bup = 0;
@@ -654,6 +815,8 @@ void boot(void *dtree)
     e = dt_make_node("emu68");
     dt_add_property(e, "idstring", &_verstring_object, strlen(_verstring_object));
     dt_add_property(e, "git-hash", GIT_SHA, strlen(GIT_SHA));
+    dt_add_property(e, "variant", BUILD_VARIANT, strlen(BUILD_VARIANT));
+    dt_add_property(e, "support", supporters, supporters_size);
     dt_add_node(NULL, e);
 
     /*
@@ -688,7 +851,7 @@ void boot(void *dtree)
     platform_init();
 
     /* Test if the image begins with gzip header. If yes, then this is the firmware blob */
-    if (((uint8_t *)initramfs_loc)[0] == 0x1f && ((uint8_t *)initramfs_loc)[1] == 0x8b)
+    if (initramfs_size != 0 && ((uint8_t *)initramfs_loc)[0] == 0x1f && ((uint8_t *)initramfs_loc)[1] == 0x8b)
     {
         struct libdeflate_decompressor *decomp = libdeflate_alloc_decompressor();
         
@@ -851,7 +1014,7 @@ void boot(void *dtree)
                 }
 
                 mmu_map(sys_memory[block].mb_Base, sys_memory[block].mb_Base, size,
-                        MMU_ACCESS | MMU_ISHARE | MMU_ATTR(0), 0);
+                        MMU_ACCESS | MMU_ISHARE | MMU_ATTR_CACHED, 0);
 
                 if (sys_memory[block].mb_Base + size > top_of_ram)
                 {
@@ -866,11 +1029,11 @@ void boot(void *dtree)
             };
             dt_add_property(dt_find_node("/emu68"), "vc4-mem", reg, 8);
 
-            mmu_map(vid_base, vid_base, vid_memory * 1024*1024, MMU_ACCESS | MMU_OSHARE | MMU_ALLOW_EL0 | MMU_ATTR(3), 0);
+            mmu_map(vid_base, vid_base, vid_memory * 1024*1024, MMU_ACCESS | MMU_OSHARE | MMU_ALLOW_EL0 | MMU_ATTR_WRITETHROUGH, 0);
         }
 
-        mmu_map(kernel_new_loc + (KERNEL_SYS_PAGES << 21), 0xffffffe000000000, KERNEL_JIT_PAGES << 21, MMU_ACCESS | MMU_ISHARE | MMU_ATTR(0), 0);
-        mmu_map(kernel_new_loc + (KERNEL_SYS_PAGES << 21), 0xfffffff000000000, KERNEL_JIT_PAGES << 21, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR(0), 0);
+        mmu_map(kernel_new_loc + (KERNEL_SYS_PAGES << 21), 0xffffffe000000000, KERNEL_JIT_PAGES << 21, MMU_ACCESS | MMU_ISHARE | MMU_ATTR_CACHED, 0);
+        mmu_map(kernel_new_loc + (KERNEL_SYS_PAGES << 21), 0xfffffff000000000, KERNEL_JIT_PAGES << 21, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR_CACHED, 0);
 
         jit_tlsf = tlsf_init_with_memory((void*)0xffffffe000000000, KERNEL_JIT_PAGES << 21);
 
@@ -905,18 +1068,26 @@ void boot(void *dtree)
 
         const uint32_t tlb_flusher[] = {
             LE32(0xd5033b9f),       // dsb   ish
+            LE32(0xd5033b9f),       // dsb   ish
+            LE32(0xd5033b9f),       // dsb   ish
+            LE32(0xd508831f),       // tlbi  vmalle1is
+            LE32(0xd5033f9f),       // dsb   sy
+            LE32(0xd5033fdf),       // isb
             LE32(0xd508831f),       // tlbi  vmalle1is
             LE32(0xd5033f9f),       // dsb   sy
             LE32(0xd5033fdf),       // isb
             LE32(0xd65f03c0)        // ret
         };
 
-        void *addr = tlsf_malloc(jit_tlsf, 4*5);
+        void *addr = tlsf_malloc_aligned(jit_tlsf, 4*10, 4096);
         void (*flusher)() = (void (*)())((uintptr_t)addr | 0x1000000000);
-        DuffCopy(addr, tlb_flusher, 5);
-        arm_flush_cache((uintptr_t)addr, 4*5);
+        DuffCopy(addr, tlb_flusher, 10);
+        arm_flush_cache((uintptr_t)addr, 4*10);
+        arm_icache_invalidate((uintptr_t)flusher, 4*10);
         flusher();
         tlsf_free(jit_tlsf, addr);
+
+        kprintf("[BOOT] TLB invalidated\n");
     }
 
     while(__atomic_test_and_set(&boot_lock, __ATOMIC_ACQUIRE)) asm volatile("yield");
@@ -1137,7 +1308,7 @@ void boot(void *dtree)
         {
             *(uint32_t *)(0xffffff9000f80000 + i) = ps_read_32(0xf80000 + i);
         }
-        mmu_map(0xf80000, 0xf80000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR(0), 0);
+        mmu_map(0xf80000, 0xf80000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR_CACHED, 0);
 
         /* For larger ROMs copy also 512K from 0xe00000 (1M) and 0xa80000, 0xb00000 (2M) */ 
         if (rom_copy == 1024)
@@ -1147,7 +1318,7 @@ void boot(void *dtree)
                 *(uint32_t *)(0xffffff9000e00000 + i) = ps_read_32(0xe00000 + i);
             }
 
-            mmu_map(0xe00000, 0xe00000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR(0), 0);
+            mmu_map(0xe00000, 0xe00000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR_CACHED, 0);
         }
         else if (rom_copy == 2048)
         {
@@ -1164,14 +1335,14 @@ void boot(void *dtree)
                 *(uint32_t *)(0xffffff9000b00000 + i) = ps_read_32(0xb00000 + i);
             }
 
-            mmu_map(0xa80000, 0xa80000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR(0), 0);
-            mmu_map(0xb00000, 0xb00000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR(0), 0);
-            mmu_map(0xe00000, 0xe00000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR(0), 0);
+            mmu_map(0xa80000, 0xa80000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR_CACHED, 0);
+            mmu_map(0xb00000, 0xb00000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR_CACHED, 0);
+            mmu_map(0xe00000, 0xe00000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR_CACHED, 0);
         }
         else
         {
             /* For 512K or lower create shadow rom at 0xe00000 */
-            mmu_map(0xf80000, 0xe00000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR(0), 0);
+            mmu_map(0xf80000, 0xe00000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR_CACHED, 0);
         }
     }
     else if (initramfs_loc != NULL && initramfs_size != 0)
@@ -1179,12 +1350,12 @@ void boot(void *dtree)
         extern uint32_t rom_mapped;
 
         kprintf("[BOOT] Loading ROM from %p, size %d\n", initramfs_loc, initramfs_size);
-        mmu_map(0xf80000, 0xf80000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR(0), 0);
+        mmu_map(0xf80000, 0xf80000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR_CACHED, 0);
             
         if (initramfs_size == 262144)
         {
             /* Make a shadow of 0xf80000 at 0xe00000 */
-            mmu_map(0xe00000, 0xe00000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR(0), 0);
+            mmu_map(0xe00000, 0xe00000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR_CACHED, 0);
             DuffCopy((void*)0xffffff9000f80000, initramfs_loc, 262144 / 4);
             DuffCopy((void*)0xffffff9000fc0000, initramfs_loc, 262144 / 4);
             DuffCopy((void*)0xffffff9000e00000, (void*)0xffffff9000f80000, 524288 / 4);
@@ -1192,22 +1363,22 @@ void boot(void *dtree)
         else if (initramfs_size == 524288)
         {
             /* Make a shadow of 0xf80000 at 0xe00000 */
-            mmu_map(0xe00000, 0xe00000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR(0), 0);
+            mmu_map(0xe00000, 0xe00000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR_CACHED, 0);
             DuffCopy((void*)0xffffff9000e00000, initramfs_loc, 524288 / 4);
             DuffCopy((void*)0xffffff9000f80000, initramfs_loc, 524288 / 4);
         }
         else if (initramfs_size == 1048576)
         {
-            mmu_map(0xe00000, 0xe00000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR(0), 0);
-            mmu_map(0xf00000, 0xf00000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR(0), 0);
+            mmu_map(0xe00000, 0xe00000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR_CACHED, 0);
+            mmu_map(0xf00000, 0xf00000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR_CACHED, 0);
             DuffCopy((void*)0xffffff9000e00000, initramfs_loc, 524288 / 4);
             DuffCopy((void*)0xffffff9000f00000, initramfs_loc, 524288 / 4);
             DuffCopy((void*)0xffffff9000f80000, (void*)((uintptr_t)initramfs_loc + 524288), 524288 / 4);
         }
         else if (initramfs_size == 2097152) {
-            mmu_map(0xa80000, 0xa80000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR(0), 0);
-            mmu_map(0xb00000, 0xb00000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR(0), 0);
-            mmu_map(0xe00000, 0xe00000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR(0), 0);
+            mmu_map(0xa80000, 0xa80000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR_CACHED, 0);
+            mmu_map(0xb00000, 0xb00000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR_CACHED, 0);
+            mmu_map(0xe00000, 0xe00000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR_CACHED, 0);
             DuffCopy((void*)0xffffff9000e00000, initramfs_loc, 524288 / 4);
             DuffCopy((void*)0xffffff9000a80000, (void*)((uintptr_t)initramfs_loc + 524288), 524288 / 4);
             DuffCopy((void*)0xffffff9000b00000, (void*)((uintptr_t)initramfs_loc + 2*524288), 524288 / 4);
@@ -1360,7 +1531,7 @@ void M68K_LoadContext(struct M68KState *ctx)
     asm volatile("ldr d%0, %1"::"i"(REG_FP6),"m"(ctx->FP[6]));
     asm volatile("ldr d%0, %1"::"i"(REG_FP7),"m"(ctx->FP[7]));
 
-    asm volatile("ldrh w1, %0; msr tpidr_EL0, x1"::"m"(ctx->SR):"x1");
+    asm volatile("ldrh w1, %0; rbit w2, w1; bfxil w1, w2, 30, 2; msr tpidr_EL0, x1"::"m"(ctx->SR):"x1","x2");
     if (ctx->SR & SR_S)
     {
         if (ctx->SR & SR_M)
@@ -1402,7 +1573,7 @@ void M68K_SaveContext(struct M68KState *ctx)
     asm volatile("str d%0, %1"::"i"(REG_FP6),"m"(ctx->FP[6]));
     asm volatile("str d%0, %1"::"i"(REG_FP7),"m"(ctx->FP[7]));
 
-    asm volatile("mrs x1, tpidr_EL0; strh w1, %0"::"m"(ctx->SR):"x1");
+    asm volatile("mrs x1, tpidr_EL0; rbit w2, w1; bfxil w1, w2, 30, 2; strh w1, %0"::"m"(ctx->SR):"x1","x2");
     if (ctx->SR & SR_S)
     {
         if (ctx->SR & SR_M)
@@ -1516,7 +1687,7 @@ struct M68KTranslationUnit *_FindUnit(uint16_t *ptr)
 void  __attribute__((used)) stub_FindUnit()
 {
     asm volatile(
-"       .align  5                           \n"
+"       .align  8                           \n"
 "FindUnit:                                  \n"
 "       adrp    x4, ICache                  \n"
 "       add     x4, x4, :lo12:ICache        \n"
@@ -1554,6 +1725,8 @@ extern volatile unsigned char bus_lock;
 void  __attribute__((used)) stub_ExecutionLoop()
 {
     asm volatile(
+"       .globl ExecutionLoop                \n"
+"       .align 8                            \n"
 "ExecutionLoop:                             \n"
 "       stp     x29, x30, [sp, #-128]!      \n"
 "       stp     x27, x28, [sp, #1*16]       \n"
@@ -1563,7 +1736,8 @@ void  __attribute__((used)) stub_ExecutionLoop()
 "       stp     x19, x20, [sp, #5*16]       \n"
 "       mov     v28.d[0], xzr               \n"
 "       bl      M68K_LoadContext            \n"
-"       .align 6                            \n"
+"       b       1f                          \n"
+"       .align 8                            \n"
 "1:                                         \n"
 /*
 "       mrs     x0, PMCCNTR_EL0             \n"
@@ -1797,6 +1971,8 @@ void  __attribute__((used)) stub_ExecutionLoop()
 "94:    mov     w%[reg_sp], V31.S[3]        \n" // Load MSP
 
 "93:    mov     w5, w2                      \n" // Make a copy of SR
+"       rbit    w3, w2                      \n" // Reverse C and V!
+"       bfxil   w2, w3, 30, 2               \n" // Put reversed C and V into old SR (to be pushed on stack)
 "       bfi     w5, w1, %[srb_ipm], 3       \n" // Insert IPL level to SR register IPM field
 "       lsl     w3, w1, #2                  \n" // Calculate vector offset
 "       add     w3, w3, #0x60               \n" 
@@ -1835,12 +2011,14 @@ void  __attribute__((used)) stub_ExecutionLoop()
 "94:    bic     w1, w1, w4                  \n" // Clear pending interrupt flag
 "       strb     w1, [x0, #%[arm]]          \n" // Store PINT
 "       mov     w5, w2                      \n" // Make a copy of SR
+"       rbit    w3, w2                      \n" // Reverse C and V!
+"       bfxil   w2, w3, 30, 2               \n" // Put reversed C and V into old SR (to be pushed on stack)
 "       bfi     w5, w3, %[srb_ipm], 3       \n" // Insert level to SR register
 "       lsl     w3, w3, #2                  \n"
 "       add     w3, w3, #0x60               \n" // Calculate vector offset
-"       strh    w3, [x%[reg_sp], #-2]!      \n" // Push frame format 0
-"       str     w%[reg_pc], [x%[reg_sp], #-4]! \n" // Push address of next instruction
-"       strh    w2, [x%[reg_sp], #-2]!      \n" // Push old SR
+"       strh    w2, [x%[reg_sp], #-8]!      \n" // Push old SR
+"       str     w%[reg_pc], [x%[reg_sp], #2] \n" // Push address of next instruction
+"       strh    w3, [x%[reg_sp], #6]        \n" // Push frame format 0
 "       bic     w5, w5, #0xc000             \n" // Clear T0 and T1
 "       orr     w5, w5, #0x2000             \n" // Set S bit
 "       msr     TPIDR_EL0, x5               \n" // Update SR
@@ -1892,6 +2070,8 @@ void M68K_StartEmu(void *addr, void *fdt)
     uint32_t m68k_pc;
     uint64_t cnt1 = 0, cnt2 = 0;
 
+    cache_setup();
+
     M68K_InitializeCache();
 
     bzero(&__m68k, sizeof(__m68k));
@@ -1919,9 +2099,15 @@ void M68K_StartEmu(void *addr, void *fdt)
     __m68k.JIT_UNIT_COUNT = 0;
     __m68k.JIT_SOFTFLUSH_THRESH = EMU68_WEAK_CFLUSH_LIMIT;
     __m68k.JIT_CONTROL = EMU68_WEAK_CFLUSH ? JCCF_SOFT : 0;
-    __m68k.JIT_CONTROL |= (EMU68_M68K_INSN_DEPTH & JCCB_INSN_DEPTH_MASK) << JCCB_INSN_DEPTH;
-    __m68k.JIT_CONTROL |= (EMU68_BRANCH_INLINE_DISTANCE & JCCB_INLINE_RANGE_MASK) << JCCB_INLINE_RANGE;
+    __m68k.JIT_CONTROL |= (emu68_icnt & JCCB_INSN_DEPTH_MASK) << JCCB_INSN_DEPTH;
+    __m68k.JIT_CONTROL |= (emu68_irng & JCCB_INLINE_RANGE_MASK) << JCCB_INLINE_RANGE;
     __m68k.JIT_CONTROL |= (EMU68_MAX_LOOP_COUNT & JCCB_LOOP_COUNT_MASK) << JCCB_LOOP_COUNT;
+    __m68k.JIT_CONTROL2 = chip_slowdown ? JC2F_CHIP_SLOWDOWN : 0;
+    __m68k.JIT_CONTROL2 |= dbf_slowdown ? JC2F_DBF_SLOWDOWN : 0;
+    __m68k.JIT_CONTROL2 |= (emu68_ccrd  << JC2B_CCR_SCAN_DEPTH); 
+    __m68k.JIT_CONTROL2 |= ((cs_dist - 1) << JC2B_CHIP_SLOWDOWN_RATIO);
+    __m68k.JIT_CONTROL2 |= blitwait ? JC2F_BLITWAIT : 0;
+
 #else
     __m68k.D[0].u32 = BE32((uint32_t)pitch);
     __m68k.D[1].u32 = BE32((uint32_t)fb_width);
@@ -1953,11 +2139,11 @@ void M68K_StartEmu(void *addr, void *fdt)
             if (strstr(prop->op_value, "enable_cache"))
                 __m68k.CACR = BE32(0x80008000);
             if (strstr(prop->op_value, "enable_c0_slow"))
-                mmu_map(0xC00000, 0xC00000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_ATTR(0), 0);
+                mmu_map(0xC00000, 0xC00000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_ATTR_CACHED, 0);
             if (strstr(prop->op_value, "enable_c8_slow"))
-                mmu_map(0xC80000, 0xC80000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_ATTR(0), 0);
+                mmu_map(0xC80000, 0xC80000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_ATTR_CACHED, 0);
             if (strstr(prop->op_value, "enable_d0_slow"))
-                mmu_map(0xd00000, 0xd00000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_ATTR(0), 0);
+                mmu_map(0xd00000, 0xd00000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_ATTR_CACHED, 0);
 
             extern int disasm;
             extern int debug;

@@ -280,7 +280,7 @@ void platform_init()
             (void)addr_bus;
 
             mmu_map(addr_cpu, start_map << 21, addr_len, 
-                MMU_ACCESS | MMU_ALLOW_EL0 | MMU_ATTR(1), 0);
+                MMU_ACCESS | MMU_ALLOW_EL0 | MMU_ATTR_DEVICE, 0);
 
             kprintf("bus: %08x, cpu: %08x, len: %08x\n", addr_bus, addr_cpu, addr_len);
 
@@ -310,7 +310,8 @@ void platform_post_init()
         kprintf("[BOOT] Changing ARM clock from %d MHz to %d MHz\n", get_clock_rate(3)/1000000, get_max_clock_rate(3)/1000000);
         set_clock_rate(3, get_max_clock_rate(3));
     }
-    kprintf("[BOOT] ARM Clock at %d MHz\n", get_clock_rate(3) / 1000000);
+    kprintf("[BOOT] ARM Clock at %d MHz\n", get_clock_rate(3) / 1000000);  
+    kprintf("[BOOT] CORE Clock at %d MHz\n", get_clock_rate(4) / 1000000);
 
     get_vc_memory(&base_vcmem, &size_vcmem);
     kprintf("[BOOT] VC4 memory: %p-%p\n", (intptr_t)base_vcmem, (intptr_t)base_vcmem + size_vcmem - 1);
@@ -318,7 +319,7 @@ void platform_post_init()
     if (base_vcmem && size_vcmem)
     {
         mmu_map((uintptr_t)base_vcmem, (uintptr_t)base_vcmem, size_vcmem,
-                MMU_ACCESS | MMU_OSHARE | MMU_ALLOW_EL0 | MMU_ATTR(3), 0);
+                MMU_ACCESS | MMU_OSHARE | MMU_ALLOW_EL0 | MMU_ATTR_WRITETHROUGH, 0);
     }
 
     display_logo();

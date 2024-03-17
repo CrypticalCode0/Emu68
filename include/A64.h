@@ -98,6 +98,13 @@
 #define ATTR_CACHED         0xff
 #define ATTR_WRTHROUGH      0xbb
 
+/* Keep MMU_ATTR_ENTRIES and following MMU_ATTR_x in sync!!!! */
+#define MMU_ATTR_ENTRIES ((ATTR_CACHED << 8) | (ATTR_DEVICE_nGnRE) | (ATTR_NOCACHE << 16) | (ATTR_WRTHROUGH << 24))
+#define MMU_ATTR_CACHED         MMU_ATTR(1)
+#define MMU_ATTR_DEVICE         MMU_ATTR(0)
+#define MMU_ATTR_UNCACHED       MMU_ATTR(2)
+#define MMU_ATTR_WRITETHROUGH   MMU_ATTR(3)
+
 #define SP      31  /* 31 encodes SP base, or */
 #define ZR      31  /* Zero register, depending on usage */
 
@@ -126,8 +133,12 @@ static inline uint32_t INSN_TO_LE(uint32_t insn)
 void kprintf(const char * format, ...);
 #define ASSERT_REG(reg) \
     do { if ((reg) > 31) kprintf("[ASSERT] %s: Using uninitialized register (%x) at line %d?\n", __PRETTY_FUNCTION__, (reg), __LINE__); } while(0)
+#if 0
 #define ASSERT_OFFSET(offset, mask) \
     do { if ((offset) & ~(mask)) kprintf("[ASSERT] %s: Offset out of range: %x mask %x at line %d\n", __PRETTY_FUNCTION__, (offset), (mask), __LINE__); } while(0)
+#else
+#define ASSERT_OFFSET(offset, mask) /* */
+#endif
 
 /* Branches */
 static inline uint32_t b_cc(uint8_t cc, int32_t offset19) { ASSERT_OFFSET(offset19, 0x7ffff); return I32(0x54000000 | (cc & 15) | ((offset19 & 0x7ffff) << 5)); }
@@ -744,21 +755,48 @@ uint32_t * EMIT_ClearFlags(uint32_t * ptr, uint8_t cc, uint8_t flags)
 static inline __attribute__((always_inline))
 uint32_t * EMIT_GetNZ00(uint32_t * ptr, uint8_t cc, uint8_t *not_done)
 {
+    if (*not_done == 0)
+        return ptr;
+
     uint8_t tmp_reg = RA_AllocARMRegister(&ptr);
 
-    *ptr++ = get_nzcv(tmp_reg);
-#if 1
-    *ptr++ = bfxil(cc, tmp_reg, 28, 4);
-    *ptr++ = bic_immed(cc, cc, 2, 0);
-#else
-    *ptr++ = lsr(tmp_reg, tmp_reg, 28);
-    *ptr++ = bic_immed(cc, cc, 4, 0);
-    *ptr++ = and_immed(tmp_reg, tmp_reg, 2, 30);
-    *ptr++ = orr_reg(cc, cc, tmp_reg, LSL, 0);
-#endif
-    RA_FreeARMRegister(&ptr, tmp_reg);
+    if (__builtin_popcount(*not_done) == 1)
+    {
+        switch(*not_done)
+        {
+            case 1: // M68K C
+                *ptr++ = bic_immed(cc, cc, 1, 31);
+                (*not_done) &= ~0x01;
+                break;
+            case 2: // M68K V
+                *ptr++ = bic_immed(cc, cc, 1, 0);
+                (*not_done) &= ~0x02;
+                break;
+            case 4: // M68K Z
+                *ptr++ = cset(tmp_reg, A64_CC_EQ);
+                *ptr++ = bfi(cc, tmp_reg, 2, 1);
+                (*not_done) &= ~0x04;
+                break;
+            case 8: // M68K N
+                *ptr++ = cset(tmp_reg, A64_CC_MI);
+                *ptr++ = bfi(cc, tmp_reg, 3, 1);
+                (*not_done) &= ~0x08;
+                break;
+            default:
+                break;
+        }
+    }
+    else
+    {
+        *ptr++ = get_nzcv(tmp_reg);
+        *ptr++ = bfxil(cc, tmp_reg, 28, 4);
+        // Clear C+V only if needed
+        if (*not_done & 3)
+            *ptr++ = bic_immed(cc, cc, 2, 0);
+        (*not_done) &= 0x10;
+    }
 
-    (*not_done) &= 0x10;
+    RA_FreeARMRegister(&ptr, tmp_reg);
 
     return ptr;
 }
@@ -766,63 +804,161 @@ uint32_t * EMIT_GetNZ00(uint32_t * ptr, uint8_t cc, uint8_t *not_done)
 static inline __attribute__((always_inline))
 uint32_t * EMIT_GetNZxx(uint32_t * ptr, uint8_t cc, uint8_t *not_done)
 {
+    if (*not_done == 0)
+        return ptr;
+
     uint8_t tmp_reg = RA_AllocARMRegister(&ptr);
 
-    *ptr++ = get_nzcv(tmp_reg);
+    if (__builtin_popcount(*not_done) == 1)
+    {
+        switch(*not_done)
+        {
+            case 4: // M68K Z
+                *ptr++ = cset(tmp_reg, A64_CC_EQ);
+                *ptr++ = bfi(cc, tmp_reg, 2, 1);
+                (*not_done) &= ~0x04;
+                break;
+            case 8: // M68K N
+                *ptr++ = cset(tmp_reg, A64_CC_MI);
+                *ptr++ = bfi(cc, tmp_reg, 3, 1);
+                (*not_done) &= ~0x08;
+                break;
+            default:
+                break;
+        }
+    }
+    else
+    {
+        *ptr++ = get_nzcv(tmp_reg);
+        *ptr++ = ror(tmp_reg, tmp_reg, 30);
+        *ptr++ = bfi(cc, tmp_reg, 2, 2);
+        (*not_done) &= 0x13;
+    }
+    RA_FreeARMRegister(&ptr, tmp_reg);
+    
+    return ptr;
+}
+
+static inline __attribute__((always_inline))
+uint32_t * EMIT_GetNZCV(uint32_t * ptr, uint8_t cc, uint8_t *not_done)
+{
+    if (*not_done == 0)
+        return ptr;
+
+    uint8_t tmp_reg = RA_AllocARMRegister(&ptr);
+
+    if (__builtin_popcount(*not_done) == 1)
+    {
+        switch(*not_done)
+        {
+            case 1: // M68K C
+                *ptr++ = cset(tmp_reg, A64_CC_CS);
+                *ptr++ = bfi(cc, tmp_reg, 1, 1);
+                (*not_done) &= ~0x01;
+                break;
+            case 2: // M68K V
+                *ptr++ = cset(tmp_reg, A64_CC_VS);
+                *ptr++ = bfi(cc, tmp_reg, 0, 1);
+                (*not_done) &= ~0x02;
+                break;
+            case 4: // M68K Z
+                *ptr++ = cset(tmp_reg, A64_CC_EQ);
+                *ptr++ = bfi(cc, tmp_reg, 2, 1);
+                (*not_done) &= ~0x04;
+                break;
+            case 8: // M68K N
+                *ptr++ = cset(tmp_reg, A64_CC_MI);
+                *ptr++ = bfi(cc, tmp_reg, 3, 1);
+                (*not_done) &= ~0x08;
+                break;
+            default:
+                break;
+        }
+    }
+    else
+    {
+        *ptr++ = get_nzcv(tmp_reg);
+        *ptr++ = bfxil(cc, tmp_reg, 28, 4);
+        (*not_done) &= 0x10;
+    }
+
+    if (*not_done) {
+        uint8_t clr_flags = *not_done;
+        if ((clr_flags & 3) != 0 && (clr_flags & 3) < 3)
+            clr_flags ^= 3;
+        ptr = EMIT_ClearFlags(ptr, cc, clr_flags);
+    }
+
+    RA_FreeARMRegister(&ptr, tmp_reg);
+
+    return ptr;
+}
+
+static inline __attribute__((always_inline))
+uint32_t * EMIT_GetNZCVX(uint32_t * ptr, uint8_t cc, uint8_t *not_done)
+{
+    if (*not_done == 0)
+        return ptr;
+
+    uint8_t tmp_reg = RA_AllocARMRegister(&ptr);
+
+    if (__builtin_popcount(*not_done) == 1)
+    {
+        switch(*not_done)
+        {
+            case 1: // M68K C
+                *ptr++ = cset(tmp_reg, A64_CC_CS);
+                *ptr++ = bfi(cc, tmp_reg, 1, 1);
+                (*not_done) &= ~0x01;
+                break;
+            case 2: // M68K V
+                *ptr++ = cset(tmp_reg, A64_CC_VS);
+                *ptr++ = bfi(cc, tmp_reg, 0, 1);
+                (*not_done) &= ~0x02;
+                break;
+            case 4: // M68K Z
+                *ptr++ = cset(tmp_reg, A64_CC_EQ);
+                *ptr++ = bfi(cc, tmp_reg, 2, 1);
+                (*not_done) &= ~0x04;
+                break;
+            case 8: // M68K N
+                *ptr++ = cset(tmp_reg, A64_CC_MI);
+                *ptr++ = bfi(cc, tmp_reg, 3, 1);
+                (*not_done) &= ~0x08;
+                break;
+            case 16: // M68K X
+                *ptr++ = cset(tmp_reg, A64_CC_CS);
+                *ptr++ = bfi(cc, tmp_reg, 4, 1);
+                (*not_done) &= ~0x10;
+                break;
+            default:
+                break;
+        }
+    }
+    else if (__builtin_popcount(*not_done) > 2)
+    {
+        *ptr++ = get_nzcv(tmp_reg);
+        *ptr++ = bfxil(cc, tmp_reg, 28, 4);
+        if (*not_done & 0x10)
+        {
 #if 1
-    *ptr++ = ror(tmp_reg, tmp_reg, 30);
-    *ptr++ = bfi(cc, tmp_reg, 2, 2);
+            *ptr++ = cset(tmp_reg, A64_CC_CS);
+            *ptr++ = bfi(cc, tmp_reg, 4, 1);
 #else
-    *ptr++ = lsr(tmp_reg, tmp_reg, 28);
-    *ptr++ = bic_immed(cc, cc, 2, 2);
-    *ptr++ = and_immed(tmp_reg, tmp_reg, 2, 30);
-    *ptr++ = orr_reg(cc, cc, tmp_reg, LSL, 0);
+            *ptr++ = orr_immed(tmp_reg, cc, 1, 28);
+            *ptr++ = bic_immed(cc, cc, 1, 28);
+            *ptr++ = csel(cc, tmp_reg, cc, A64_CC_CS);
 #endif
-    RA_FreeARMRegister(&ptr, tmp_reg);
-
-    (*not_done) &= 0x13;
-    return ptr;
-}
-
-static inline __attribute__((always_inline))
-uint32_t * EMIT_GetNZVC(uint32_t * ptr, uint8_t cc, uint8_t *not_done)
-{
-    uint8_t tmp_reg = RA_AllocARMRegister(&ptr);
-
-    if (__builtin_popcount(*not_done) > 2)
-    {
-        *ptr++ = get_nzcv(tmp_reg);
-        *ptr++ = bfxil(cc, tmp_reg, 28, 4);
-        *ptr++ = rbit(tmp_reg, tmp_reg);
-        *ptr++ = bfxil(cc, tmp_reg, 2, 2);
-        (*not_done) &= 0x10;
-    }
-
-    if (*not_done)
-        ptr = EMIT_ClearFlags(ptr, cc, *not_done);
-
-    RA_FreeARMRegister(&ptr, tmp_reg);
-
-    return ptr;
-}
-
-static inline __attribute__((always_inline))
-uint32_t * EMIT_GetNZVCX(uint32_t * ptr, uint8_t cc, uint8_t *not_done)
-{
-    uint8_t tmp_reg = RA_AllocARMRegister(&ptr);
-
-    if (__builtin_popcount(*not_done) > 2)
-    {
-        *ptr++ = get_nzcv(tmp_reg);
-        *ptr++ = bfxil(cc, tmp_reg, 28, 4);
-        *ptr++ = rbit(tmp_reg, tmp_reg);
-        *ptr++ = bfxil(cc, tmp_reg, 2, 2);
-        *ptr++ = bfi(cc, cc, 4, 1);
+        }
         (*not_done) = 0;
     }
 
-    if (*not_done)
-        ptr = EMIT_ClearFlags(ptr, cc, *not_done);
+    if (*not_done) {
+        uint8_t clr_flags = *not_done;
+        if ((clr_flags & 3) != 0 && (clr_flags & 3) < 3)
+            clr_flags ^= 3;
+        ptr = EMIT_ClearFlags(ptr, cc, clr_flags);
+    }
 
     RA_FreeARMRegister(&ptr, tmp_reg);
 
@@ -830,22 +966,60 @@ uint32_t * EMIT_GetNZVCX(uint32_t * ptr, uint8_t cc, uint8_t *not_done)
 }
 
 static inline __attribute__((always_inline))
-uint32_t * EMIT_GetNZVnC(uint32_t * ptr, uint8_t cc, uint8_t *not_done)
+uint32_t * EMIT_GetNZnCV(uint32_t * ptr, uint8_t cc, uint8_t *not_done)
 {
+    if (*not_done == 0)
+        return ptr;
+
     uint8_t tmp_reg = RA_AllocARMRegister(&ptr);
 
-    if (__builtin_popcount(*not_done) > 2)
+    if (__builtin_popcount(*not_done) == 1)
+    {
+        switch(*not_done)
+        {
+            case 1: // M68K C
+                *ptr++ = cset(tmp_reg, A64_CC_CC);
+                *ptr++ = bfi(cc, tmp_reg, 1, 1);
+                (*not_done) &= ~0x01;
+                break;
+            case 2: // M68K V
+                *ptr++ = cset(tmp_reg, A64_CC_VS);
+                *ptr++ = bfi(cc, tmp_reg, 0, 1);
+                (*not_done) &= ~0x02;
+                break;
+            case 4: // M68K Z
+                *ptr++ = cset(tmp_reg, A64_CC_EQ);
+                *ptr++ = bfi(cc, tmp_reg, 2, 1);
+                (*not_done) &= ~0x04;
+                break;
+            case 8: // M68K N
+                *ptr++ = cset(tmp_reg, A64_CC_MI);
+                *ptr++ = bfi(cc, tmp_reg, 3, 1);
+                (*not_done) &= ~0x08;
+                break;
+            default:
+                break;
+        }
+    }
+    else 
     {
         *ptr++ = get_nzcv(tmp_reg);
+        
+        /* If C is needed, inverse it */
+        if (*not_done & 0x01)
+            *ptr++ = eor_immed(tmp_reg, tmp_reg, 1, 3);
+
         *ptr++ = bfxil(cc, tmp_reg, 28, 4);
-        *ptr++ = eor_immed(tmp_reg, tmp_reg, 1, 3);
-        *ptr++ = rbit(tmp_reg, tmp_reg);
-        *ptr++ = bfxil(cc, tmp_reg, 2, 2);
+        
         (*not_done) &= 0x10;
     }
-
-    if (*not_done)
-        ptr = EMIT_ClearFlags(ptr, cc, *not_done);
+    
+    if (*not_done) {
+        uint8_t clr_flags = *not_done;
+        if ((clr_flags & 3) != 0 && (clr_flags & 3) < 3)
+            clr_flags ^= 3;
+        ptr = EMIT_ClearFlags(ptr, cc, clr_flags);
+    }
 
     RA_FreeARMRegister(&ptr, tmp_reg);
 
@@ -853,28 +1027,80 @@ uint32_t * EMIT_GetNZVnC(uint32_t * ptr, uint8_t cc, uint8_t *not_done)
 }
 
 static inline __attribute__((always_inline))
-uint32_t * EMIT_GetNZVnCX(uint32_t * ptr, uint8_t cc, uint8_t *not_done)
+uint32_t * EMIT_GetNZnCVX(uint32_t * ptr, uint8_t cc, uint8_t *not_done)
 {
+    if (*not_done == 0)
+        return ptr;
+
     uint8_t tmp_reg = RA_AllocARMRegister(&ptr);
 
-    if (__builtin_popcount(*not_done) > 2)
+    if (__builtin_popcount(*not_done) == 1)
+    {
+        switch(*not_done)
+        {
+            case 1: // M68K C
+                *ptr++ = cset(tmp_reg, A64_CC_CC);
+                *ptr++ = bfi(cc, tmp_reg, 1, 1);
+                (*not_done) &= ~0x01;
+                break;
+            case 2: // M68K V
+                *ptr++ = cset(tmp_reg, A64_CC_VS);
+                *ptr++ = bfi(cc, tmp_reg, 0, 1);
+                (*not_done) &= ~0x02;
+                break;
+            case 4: // M68K Z
+                *ptr++ = cset(tmp_reg, A64_CC_EQ);
+                *ptr++ = bfi(cc, tmp_reg, 2, 1);
+                (*not_done) &= ~0x04;
+                break;
+            case 8: // M68K N
+                *ptr++ = cset(tmp_reg, A64_CC_MI);
+                *ptr++ = bfi(cc, tmp_reg, 3, 1);
+                (*not_done) &= ~0x08;
+                break;
+            case 16: // M68K X
+                *ptr++ = cset(tmp_reg, A64_CC_CC);
+                *ptr++ = bfi(cc, tmp_reg, 4, 1);
+                (*not_done) &= ~0x10;
+                break;
+            default:
+                break;
+        }
+    }
+    else if (__builtin_popcount(*not_done) > 2)
     {
         *ptr++ = get_nzcv(tmp_reg);
+        /* If C or X requested, invert the flag */
+        if (*not_done & 0x11)
+            *ptr++ = eor_immed(tmp_reg, tmp_reg, 1, 3);
         *ptr++ = bfxil(cc, tmp_reg, 28, 4);
-        *ptr++ = eor_immed(tmp_reg, tmp_reg, 1, 3);
-        *ptr++ = rbit(tmp_reg, tmp_reg);
-        *ptr++ = bfxil(cc, tmp_reg, 2, 2);
-        *ptr++ = bfi(cc, cc, 4, 1);
-        (*not_done) = 0;
+        /* If X requested, add it now */
+        if (*not_done & 0x10)
+        {
+#if 1
+            *ptr++ = cset(tmp_reg, A64_CC_CC);
+            *ptr++ = bfi(cc, tmp_reg, 4, 1);
+#else
+            *ptr++ = bic_immed(cc, cc, 1, 28);
+            *ptr++ = orr_immed(tmp_reg, cc, 1, 28);
+            *ptr++ = csel(cc, tmp_reg, cc, A64_CC_CC);
+#endif
+        }
+        *not_done = 0;
     }
 
-    if (*not_done)
-        ptr = EMIT_ClearFlags(ptr, cc, *not_done);
+    if (*not_done) {
+        uint8_t clr_flags = *not_done;
+        if ((clr_flags & 3) != 0 && (clr_flags & 3) < 3)
+            clr_flags ^= 3;
+        ptr = EMIT_ClearFlags(ptr, cc, clr_flags);
+    }   
 
     RA_FreeARMRegister(&ptr, tmp_reg);
 
     return ptr;
 }
+
 
 static inline __attribute__((always_inline))
 uint32_t * EMIT_SetFlags(uint32_t * ptr, uint8_t cc, uint8_t flags)

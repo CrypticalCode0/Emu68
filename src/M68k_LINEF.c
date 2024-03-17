@@ -14,6 +14,7 @@
 #include "lists.h"
 #include "tlsf.h"
 #include "math/libm.h"
+#include "cache.h"
 
 extern uint8_t reg_Load96;
 extern uint8_t reg_Save96;
@@ -477,7 +478,7 @@ int FPSR_Update_Needed(uint16_t *ptr, int level)
 {
     int cnt = 0;
 
-    while((BE16(*ptr) & 0xfe00) != 0xf200)
+    while((cache_read_16(ICACHE, (uintptr_t)ptr) & 0xfe00) != 0xf200)
     {
         if (cnt++ > 15)
             return 1;
@@ -490,8 +491,8 @@ int FPSR_Update_Needed(uint16_t *ptr, int level)
         ptr += len;
     }
 
-    uint16_t opcode = BE16(ptr[0]);
-    uint16_t opcode2 = BE16(ptr[1]);
+    uint16_t opcode = cache_read_16(ICACHE, (uintptr_t)&ptr[0]);
+    uint16_t opcode2 = cache_read_16(ICACHE, (uintptr_t)&ptr[1]);
 
     /* In case of FNOP check subsequent instruction */
     if (opcode == 0xf280 && opcode2 == 0x0000)
@@ -628,7 +629,7 @@ uint32_t *FPU_FetchData(uint32_t *ptr, uint16_t **m68k_ptr, uint8_t *reg, uint16
                 case SIZE_W:
                 {
                     int_reg = RA_AllocARMRegister(&ptr);
-                    int16_t imm = (int16_t)BE16((*m68k_ptr)[1]);
+                    int16_t imm = (int16_t)cache_read_16(ICACHE, (uintptr_t)&(*m68k_ptr)[1]);
                     *ptr++ = movw_immed_u16(int_reg, imm & 0xffff);
                     if (imm < 0)
                         *ptr++ = movt_immed_u16(int_reg, 0xffff);
@@ -640,7 +641,7 @@ uint32_t *FPU_FetchData(uint32_t *ptr, uint16_t **m68k_ptr, uint8_t *reg, uint16
                 case SIZE_B:
                 {
                     int_reg = RA_AllocARMRegister(&ptr);
-                    int8_t imm = (int8_t)BE16((*m68k_ptr)[1]);
+                    int8_t imm = (int8_t)cache_read_16(ICACHE, (uintptr_t)&(*m68k_ptr)[1]);
                     *ptr++ = mov_immed_s8(int_reg, imm);
                     *ptr++ = scvtf_32toD(*reg, int_reg);
                     *ext_count += 1;
@@ -1095,6 +1096,7 @@ uint32_t *FPU_StoreData(uint32_t *ptr, uint16_t **m68k_ptr, uint8_t reg, uint16_
     {
         uint8_t int_reg = 0xff;
         uint8_t tmp_reg = 0xff;
+        uint8_t tmp_reg_2 = 0xff;
         uint8_t vfp_reg = RA_AllocFPURegister(&ptr);
 
         switch (size)
@@ -1116,23 +1118,41 @@ uint32_t *FPU_StoreData(uint32_t *ptr, uint16_t **m68k_ptr, uint8_t reg, uint16_
             case SIZE_W:
                 int_reg = RA_MapM68kRegister(&ptr, ea & 7);
                 tmp_reg = RA_AllocARMRegister(&ptr);
+                tmp_reg_2 = RA_AllocARMRegister(&ptr);
                 *ptr++ = frint64x(vfp_reg, reg);
                 *ptr++ = fcvtzs_Dto32(tmp_reg, vfp_reg);
+                /* Saturate the result to match in 16 bits */
+                *ptr++ = cmn_immed_lsl12(tmp_reg, 8);
+                *ptr++ = movn_immed_u16(tmp_reg_2, 0x7fff, 0);
+                *ptr++ = csel(tmp_reg, tmp_reg, tmp_reg_2, A64_CC_GE);
+                *ptr++ = mov_immed_u16(tmp_reg_2, 0x7fff, 0);
+                *ptr++ = cmp_reg(tmp_reg, tmp_reg_2, LSL, 0);
+                *ptr++ = csel(tmp_reg, tmp_reg, tmp_reg_2, A64_CC_LE);
                 *ptr++ = bfi(int_reg, tmp_reg, 0, 16);
                 RA_SetDirtyM68kRegister(&ptr, ea & 7);
                 RA_FreeARMRegister(&ptr, tmp_reg);
+                RA_FreeARMRegister(&ptr, tmp_reg_2);
                 RA_FreeARMRegister(&ptr, int_reg);
                 break;
 
             case SIZE_B:
                 int_reg = RA_MapM68kRegister(&ptr, ea & 7);
                 tmp_reg = RA_AllocARMRegister(&ptr);
+                tmp_reg_2 = RA_AllocARMRegister(&ptr);
                 *ptr++ = frint64x(vfp_reg, reg);
                 *ptr++ = fcvtzs_Dto32(tmp_reg, vfp_reg);
+                /* Saturate the result to match in 16 bits */
+                *ptr++ = cmn_immed(tmp_reg, 128);
+                *ptr++ = movn_immed_u16(tmp_reg_2, 0x7f, 0);
+                *ptr++ = csel(tmp_reg, tmp_reg, tmp_reg_2, A64_CC_GE);
+                *ptr++ = mov_immed_u16(tmp_reg_2, 0x7f, 0);
+                *ptr++ = cmp_immed(tmp_reg, 127);
+                *ptr++ = csel(tmp_reg, tmp_reg, tmp_reg_2, A64_CC_LE);
                 *ptr++ = bfi(int_reg, tmp_reg, 0, 8);
                 RA_SetDirtyM68kRegister(&ptr, ea & 7);
                 RA_FreeARMRegister(&ptr, tmp_reg);
                 RA_FreeARMRegister(&ptr, int_reg);
+                RA_FreeARMRegister(&ptr, tmp_reg_2);
                 break;
 
             default:
@@ -1151,7 +1171,6 @@ uint32_t *FPU_StoreData(uint32_t *ptr, uint16_t **m68k_ptr, uint8_t reg, uint16_
         int8_t pre_sz = 0;
         int8_t post_sz = 0;
         int8_t k = 0;
-        uint8_t tmp64 = RA_AllocARMRegister(&ptr);
         uint8_t tmp32 = RA_AllocARMRegister(&ptr);
         union {
             uint64_t u64;
@@ -1522,6 +1541,14 @@ uint32_t *FPU_StoreData(uint32_t *ptr, uint16_t **m68k_ptr, uint8_t reg, uint16_
                 val_reg = RA_AllocARMRegister(&ptr);
                 *ptr++ = frint64x(vfp_reg, reg);
                 *ptr++ = fcvtzs_Dto32(val_reg, vfp_reg);
+                
+                /* Saturate the result to match in 16 bits */
+                *ptr++ = cmn_immed_lsl12(val_reg, 8);
+                *ptr++ = movn_immed_u16(tmp32, 0x7fff, 0);
+                *ptr++ = csel(val_reg, val_reg, tmp32, A64_CC_GE);
+                *ptr++ = mov_immed_u16(tmp32, 0x7fff, 0);
+                *ptr++ = cmp_reg(val_reg, tmp32, LSL, 0);
+                *ptr++ = csel(val_reg, val_reg, tmp32, A64_CC_LE);
 
                 if (pre_sz)
                 {
@@ -1566,6 +1593,14 @@ uint32_t *FPU_StoreData(uint32_t *ptr, uint16_t **m68k_ptr, uint8_t reg, uint16_
                 val_reg = RA_AllocARMRegister(&ptr);
                 *ptr++ = frint64x(vfp_reg, reg);
                 *ptr++ = fcvtzs_Dto32(val_reg, vfp_reg);
+
+                /* Saturate the result to match in 16 bits */
+                *ptr++ = cmn_immed(val_reg, 128);
+                *ptr++ = movn_immed_u16(tmp32, 0x7f, 0);
+                *ptr++ = csel(val_reg, val_reg, tmp32, A64_CC_GE);
+                *ptr++ = mov_immed_u16(tmp32, 0x7f, 0);
+                *ptr++ = cmp_immed(val_reg, 127);
+                *ptr++ = csel(val_reg, val_reg, tmp32, A64_CC_LE);
 
                 if (pre_sz)
                 {
@@ -1616,7 +1651,6 @@ uint32_t *FPU_StoreData(uint32_t *ptr, uint16_t **m68k_ptr, uint8_t reg, uint16_
         }
 
         RA_FreeARMRegister(&ptr, tmp32);
-        RA_FreeARMRegister(&ptr, tmp64);
         RA_FreeFPURegister(&ptr, vfp_reg);
         RA_FreeARMRegister(&ptr, int_reg);
         RA_FreeARMRegister(&ptr, val_reg);
@@ -1756,7 +1790,7 @@ uint32_t icache_epilogue[MAX_EPILOGUE_LENGTH];
 void *invalidate_instruction_cache(uintptr_t target_addr, uint16_t *pc, uint32_t *arm_pc)
 {
     int i;
-    uint16_t opcode = BE16(pc[0]);
+    uint16_t opcode = cache_read_16(ICACHE, (uintptr_t)&pc[0]);
     struct M68KTranslationUnit *u;
     struct Node *n, *next;
     extern struct List LRU;
@@ -1767,6 +1801,11 @@ void *invalidate_instruction_cache(uintptr_t target_addr, uint16_t *pc, uint32_t
 
     //kprintf("[LINEF] ICache flush... Opcode=%04x, Target=%08x, PC=%08x, ARM PC=%p\n", opcode, target_addr, pc, arm_pc);
     // kprintf("[LINEF] ARM insn: %08x\n", *arm_pc);
+
+    // Invalidate entire instruction cache
+    // FIXME: Could be more precise (but most of the time everything is probably flushed anyway)
+    // NOT: cache_invalidate_range does not handle length of >16 bytes
+    cache_invalidate_all(ICACHE);
 
     for (i=0; i < MAX_EPILOGUE_LENGTH; i++)
     {
@@ -1918,8 +1957,8 @@ void __attribute__((used)) __trampoline_icache_invalidate(void)
 
 uint32_t *EMIT_FPU(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
-    uint16_t opcode = BE16((*m68k_ptr)[0]);
-    uint16_t opcode2 = BE16((*m68k_ptr)[1]);
+    uint16_t opcode = cache_read_16(ICACHE, (uintptr_t)&(*m68k_ptr)[0]);
+    uint16_t opcode2 = cache_read_16(ICACHE, (uintptr_t)&(*m68k_ptr)[1]);
     uint8_t ext_count = 1;
     (*m68k_ptr)++;
     *insn_consumed = 1;
@@ -2067,8 +2106,8 @@ uint32_t *EMIT_FPU(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed)
             ptr = EMIT_GetFPUFlags(ptr, fpsr);
         }
     }
-    /* FNOP */
-    else if (opcode == 0xf280 && opcode2 == 0)
+    /* FNOP as well as FBF.W to *any* target */
+    else if (opcode == 0xf280)
     {
         static int shown = 0;
         if (!shown) {
@@ -2210,14 +2249,14 @@ uint32_t *EMIT_FPU(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed)
         /* use 16-bit offset */
         if ((opcode & 0x0040) == 0x0000)
         {
-            branch_offset = (int16_t)BE16(*(*m68k_ptr)++);
+            branch_offset = (int16_t)cache_read_16(ICACHE, (uintptr_t)&(*(*m68k_ptr)++));
         }
         /* use 32-bit offset */
         else
         {
             uint16_t lo16, hi16;
-            hi16 = BE16(*(*m68k_ptr)++);
-            lo16 = BE16(*(*m68k_ptr)++);
+            hi16 = cache_read_16(ICACHE, (uintptr_t)&(*(*m68k_ptr)++));
+            lo16 = cache_read_16(ICACHE, (uintptr_t)&(*(*m68k_ptr)++));
             branch_offset = lo16 | (hi16 << 16);
         }
 
@@ -2750,6 +2789,55 @@ uint32_t *EMIT_FPU(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed)
         }
 
         *ptr++ = INSN_TO_LE(0xfffffff0);
+    }
+    else if ((opcode & 0xffc0) == 0xf200 && (opcode2 & 0xa07f) == 0x0021)
+    {
+        static int shown = 0;
+        if (!shown) {
+            kprintf("FMOD\n");
+            shown = 1;
+        }
+
+        uint8_t fp_src = 0xff;
+        uint8_t fp_dst = (opcode2 >> 7) & 7;
+        uint8_t tmp = RA_AllocARMRegister(&ptr);
+
+        ptr = FPU_FetchData(ptr, m68k_ptr, &fp_src, opcode, opcode2, &ext_count, 0);
+        fp_dst = RA_MapFPURegisterForWrite(&ptr, fp_dst);
+
+        /* Need to check if this method is working... */
+        /* Compute FPn / Source */
+        *ptr++ = fdivd(0, fp_dst, fp_src);
+        /* Round to zero the result -> N */
+        *ptr++ = frint64z(0, 0);
+        /* And store for later */
+        *ptr++ = fcvtzs_Dto64(tmp, 0);
+        /* Get Source * N */
+        *ptr++ = fmuld(1, 0, fp_src);
+        /* Calculate reminder */
+        *ptr++ = fsubd(fp_dst, fp_dst, 1);
+        /* Test sign of result */
+        *ptr++ = fcmpzd(0);
+        *ptr++ = bic_immed(1, 0, 25, 25);
+        *ptr++ = orr_immed(0, 0, 25, 25);
+        *ptr++ = csel(0, 1, 0, A64_CC_PL);
+
+        uint8_t fpsr = RA_ModifyFPSR(&ptr);
+        *ptr++ = bfi(fpsr, 0, 16, 8);
+
+        RA_FreeFPURegister(&ptr, fp_src);
+        RA_FreeARMRegister(&ptr, tmp);
+
+        ptr = EMIT_AdvancePC(ptr, 2 * (ext_count + 1));
+        (*m68k_ptr) += ext_count;
+
+        if (FPSR_Update_Needed(*m68k_ptr, 0))
+        {
+            uint8_t fpsr = RA_ModifyFPSR(&ptr);
+
+            *ptr++ = fcmpzd(fp_dst);
+            ptr = EMIT_GetFPUFlags(ptr, fpsr);
+        }
     }
     /* FLOGNP1 */
     else if ((opcode & 0xffc0) == 0xf200 && (opcode2 & 0xa07f) == 0x0006)
@@ -3587,6 +3675,13 @@ uint32_t *EMIT_FPU(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed)
         }
 #endif
 
+        if (precision == 4)
+        {
+            // FSMOVE (Needed by e.g. https://www.pouet.net/prod.php?which=74668)
+            *ptr++ = fcvtsd(fp_dst, fp_dst);
+            *ptr++ = fcvtds(fp_dst, fp_dst);
+        }
+
         RA_FreeFPURegister(&ptr, fp_src);
         ptr = EMIT_AdvancePC(ptr, 2 * (ext_count + 1));
         (*m68k_ptr) += ext_count;
@@ -3786,6 +3881,7 @@ uint32_t *EMIT_FPU(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed)
             tmp = RA_AllocARMRegister(&ptr);
             int regnum = 0;
             int offset = 0;
+
             if ((opcode & 0x38) == 0x20 || (opcode & 0x38) == 0x18) {
                 ptr = EMIT_LoadFromEffectiveAddress(ptr, 0, &src, opcode & 0x3f, *m68k_ptr, &ext_count, 0, NULL);
                 RA_SetDirtyM68kRegister(&ptr, 8 + (opcode & 7));
@@ -3796,6 +3892,12 @@ uint32_t *EMIT_FPU(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed)
             if (opcode2 & 0x0400) regnum++;
             if (opcode2 & 0x0800) regnum++;
             if (opcode2 & 0x1000) regnum++;
+
+            /* For immediate mode advance the ext_count accordingly */
+            if ((opcode & 0x3f) == 0x3c)
+            {
+                ext_count += 2*regnum;
+            }
 
             // In predecrement mode reserve whole space first
             if ((opcode & 0x38) == 0x20)
@@ -4276,7 +4378,7 @@ uint32_t *EMIT_FPU(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed)
                 *ptr++ = csetm(tmp, success_condition);    
             }
 
-            ptr = EMIT_StoreToEffectiveAddress(ptr, 1, &tmp, opcode & 0x3f, *m68k_ptr, &ext_count);                
+            ptr = EMIT_StoreToEffectiveAddress(ptr, 1, &tmp, opcode & 0x3f, *m68k_ptr, &ext_count, 0);
             RA_FreeARMRegister(&ptr, tmp);
         }
 
@@ -4547,7 +4649,7 @@ uint32_t *EMIT_FPU(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed)
         ext_count = 0;
 
         *ptr++ = mov_immed_u16(tmp, 0x4100, 1);
-        ptr = EMIT_StoreToEffectiveAddress(ptr, 4, &tmp, opcode & 0x3f, *m68k_ptr, &ext_count);
+        ptr = EMIT_StoreToEffectiveAddress(ptr, 4, &tmp, opcode & 0x3f, *m68k_ptr, &ext_count, 0);
 
         RA_FreeARMRegister(&ptr, tmp);
 
@@ -4569,16 +4671,16 @@ int DisableFPU = 0;
 
 uint32_t *EMIT_lineF(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
-    uint16_t opcode = BE16((*m68k_ptr)[0]);
-    uint16_t opcode2 = BE16((*m68k_ptr)[1]);
+    uint16_t opcode = cache_read_16(ICACHE, (uintptr_t)&(*m68k_ptr)[0]);
+    uint16_t opcode2 = cache_read_16(ICACHE, (uintptr_t)&(*m68k_ptr)[1]);
 
     /* Check destination coprocessor - if it is FPU go to separate function */
     if (DisableFPU == 0 && (opcode & 0x0e00) == 0x0200)
     {
         return EMIT_FPU(ptr, m68k_ptr, insn_consumed);
     }
-    /* PFLUSHA - ignore */
-    else if ((opcode & 0xffe0) == 0xf500)
+    /* PFLUSHA or PTEST - ignore */
+    else if ((opcode & 0xffe0) == 0xf500 || (opcode & 0xffd8) == 0xf548)
     {
         *ptr++ = nop();
         (*m68k_ptr)+=1;
@@ -4636,7 +4738,7 @@ uint32_t *EMIT_lineF(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed
         uint8_t buf1 = RA_AllocARMRegister(&ptr);
         uint8_t buf2 = RA_AllocARMRegister(&ptr);
         uint8_t reg = RA_MapM68kRegister(&ptr, 8 + (opcode & 7));
-        uint32_t mem = (BE16((*m68k_ptr)[1]) << 16) | BE16((*m68k_ptr)[2]);
+        uint32_t mem = (cache_read_16(ICACHE, (uintptr_t)&(*m68k_ptr)[1]) << 16) | cache_read_16(ICACHE, (uintptr_t)&(*m68k_ptr)[2]);
 
         /* Align memory pointer */
         mem &= 0xfffffff0;
