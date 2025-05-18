@@ -226,16 +226,18 @@ struct M68KState
 #define SRB_T1   15
 
 //MMUSR
-#define MMUSR_B 0x8000
-#define MMUSR_L 0x4000
-#define MMUSR_S 0x2000
-#define MMUSR_A 0x1000
-#define MMUSR_W 0x0800
-#define MMUSR_I 0x0400
-#define MMUSR_M 0x0200
-#define MMUSR_G 0x0100
-#define MMUSR_C 0x0080
-#define MMUSR_N 0x0007
+#define MMUSR_R  0x00000001
+#define MMUSR_T  0x00000002
+#define MMUSR_W  0x00000004
+#define MMUSR_M  0x00000010
+#define MMUSR_CM 0x00000060
+#define MMUSR_S  0x00000080
+#define MMUSR_U0 0x00000100
+#define MMUSR_U1 0x00000200
+#define MMUSR_U  0x00000300
+#define MMUSR_G  0x00000400
+#define MMUSR_B  0x00000800
+#define MMUSR_PA 0xfffff000
 
 //FPCR
 #define FPCR_RND	0x00000030
@@ -326,23 +328,6 @@ struct M68KState
 #define M_CC_GT 0x0e
 #define M_CC_LE 0x0f
 
-#define P_CC_BS 000
-#define P_CC_BC 001
-#define P_CC_LS 002
-#define P_CC_LC 003
-#define P_CC_SS 004
-#define P_CC_SC 005
-#define P_CC_AS 006
-#define P_CC_AC 007
-#define P_CC_WS 010
-#define P_CC_WC 011
-#define P_CC_IS 012
-#define P_CC_IC 013
-#define P_CC_GS 014
-#define P_CC_GC 015
-#define P_CC_CS 016
-#define P_CC_CC 017
-
 #define F_CC_EQ     0x01
 #define F_CC_NE     0x0e
 #define F_CC_GT     0x12
@@ -377,8 +362,10 @@ struct M68KState
 #define F_CC_SNE    0x1e
 
 //Co-processors, not defined USER coprocessors for obvious reasons
-#define cp_MMU      00
+#define cp_PMU      00
 #define cp_FPU      01
+#define cp_MMU		02
+#define cp_MOVE16	03
 
 //Vectors Exception handling
 #define VECTOR_RESET_ISP            0x000
