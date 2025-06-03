@@ -462,6 +462,7 @@ int M68K_GetLineFLength(uint16_t *insn_stream);
 uint8_t SR_GetEALength(uint16_t *insn_stream, uint8_t ea, uint8_t imm_size);
 
 typedef uint32_t * (*EMIT_Function)(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr);
+typedef uint32_t * (*EMIT_FLine)(uint32_t *ptr, uint16_t opcode, uint16_t opcode2, uint16_t **m68k_ptr);
 typedef uint32_t * (*EMIT_MultiFunction)(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_t *insn_consumed);
 
 struct OpcodeDef {
@@ -485,6 +486,23 @@ struct FPUOpcodeDef {
     uint8_t         od_BaseLength;
     uint8_t         od_HasEA;
     uint8_t         od_OpSize;
+};
+
+struct FPUFMTDef {
+    EMIT_FLine      od_Emit;
+    void *          od_Interpret;   // Not used yet.
+    uint32_t        od_FPSRNeeds;
+    uint32_t        od_FPSRSets;
+    uint8_t         od_BaseLength;
+    uint8_t         od_HasEA;
+    uint8_t         od_OpSize;
+};
+
+struct FPUFormatDef {
+    EMIT_FLine      od_Emit;
+    void *          od_Interpret;   // Not used yet.
+    uint32_t        od_FPSRNeeds;
+    uint32_t        od_FPSRSets;
 };
 
 uint32_t *EMIT_InjectPrintContext(uint32_t *ptr);

@@ -183,9 +183,6 @@ uint32_t *EMIT_CINV(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr) {
             *ptr++ = ldp64_postindex(31, 0, 1, 176);
         }
 
-        (*m68k_ptr)++;
-        *insn_consumed = 1;
-
         *ptr++ = add_immed(REG_PC, REG_PC, 2);
 
         /* Cache flushing is context synchronizing. Stop translating code here */
@@ -323,7 +320,7 @@ uint32_t *EMIT_PTEST(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr) {
 	return ptr;
 }
 
-static struct OpcodeDef InsnTable[512] = {
+static struct OpcodeDef InsnMMUTable[512] = {
   [0010 ... 0037] = { { EMIT_CINV }, NULL, SR_S, 0, 1, 0, 0},
   [0050 ... 0077] = { { EMIT_CPUSH }, NULL, SR_S, 0, 1, 0, 0},
   [0110 ... 0137] = { { EMIT_CINV }, NULL, SR_S, 0, 1, 0, 0},
@@ -343,8 +340,8 @@ uint32_t *EMIT_MMU(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed) 
     (*m68k_ptr)++;
     *insn_consumed = 1;
 
-    if (InsnTable[opcode & 0777].od_Emit)
-        ptr = InsnTable[opcode & 0777].od_Emit(ptr, opcode, m68k_ptr);
+    if (InsnMMUTable[opcode & 0777].od_Emit)
+        ptr = InsnMMUTable[opcode & 0777].od_Emit(ptr, opcode, m68k_ptr);
 
     else {
         ptr = EMIT_FlushPC(ptr);
@@ -364,8 +361,8 @@ uint32_t *EMIT_MMU(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed) 
 uint32_t GetSR_LineF(uint16_t opcode)
 {
     /* If instruction is in the table, return what flags it needs (shifted 16 bits left) and flags it sets */
-    if (InsnTable[opcode & 0777].od_Emit) {
-        return (InsnTable[opcode & 0777].od_SRNeeds << 16) | InsnTable[opcode & 0777].od_SRSets << 16;
+    if (InsnMMUTable[opcode & 0777].od_Emit) {
+        return (InsnMMUTable[opcode & 0777].od_SRNeeds << 16) | InsnMMUTable[opcode & 0777].od_SRSets << 16;
     }
     /* Instruction not found, i.e. it needs all flags and sets none (ILLEGAL INSTRUCTION exception) */
     else {
@@ -382,15 +379,14 @@ int M68K_GetLineFLength(uint16_t *insn_stream)
     int need_ea = 0;
     int opsize = 0;
 
-    if(InsnTable[opcode & 0777].od_Emit) {
-        length = InsnTable[opcode & 0777].od_BaseLength;
-        need_ea = InsnTable[opcode & 0777].od_HasEA;
-        opsize = InsnTable[opcode & 0777].od_OpSize;
+    if(InsnMMUTable[opcode & 0777].od_Emit) {
+        length = InsnMMUTable[opcode & 0777].od_BaseLength;
+        need_ea = InsnMMUTable[opcode & 0777].od_HasEA;
+        opsize = InsnMMUTable[opcode & 0777].od_OpSize;
     }
 
     if(need_ea) {
         length += SR_GetEALength(&insn_stream[length], opcode & 077, opsize);
     }
-
     return length;
 }
