@@ -17,10 +17,10 @@ uint32_t *EMIT_cpOP(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr) {
 
 	switch(cp) {
 		case cp_MMU:
-			EMIT_MMU(*ptr, **m68k_ptr, 0);
+			EMIT_MMU(*ptr, opcode, **m68k_ptr);
 		return ptr;
 		case cp_FPU:
-			EMIT_FPU(*ptr, **m68k_ptr, 0);
+			EMIT_FPU(*ptr, opcode, **m68k_ptr);
 		return ptr;
 		case cp_MOVE16:
 			if(opcode <= 0047) {
@@ -83,7 +83,7 @@ uint32_t *EMIT_cpOP(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr) {
 
 			   	*ptr++ = bic_immed(aligned_reg, reg, 4, 0);
 
-			   	if (opcode & 8) {
+				if (opcode & 8) {
 				   	*ptr++ = ldp64(aligned_mem, buf1, buf2, 0);
 				   	*ptr++ = stp64(aligned_reg, buf1, buf2, 0);
 				}
