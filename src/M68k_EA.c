@@ -8,10 +8,10 @@
     with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-#include "support.h"
-#include "M68k.h"
-#include "RegisterAllocator.h"
-#include "cache.h"
+#include "../include/support.h"
+#include "../include/M68k.h"
+#include "../include/RegisterAllocator.h"
+#include "../include/cache.h"
 
 static inline __attribute__((always_inline)) uint32_t * load_s16_ext32(uint32_t *ptr, uint8_t reg, int16_t s16)
 {

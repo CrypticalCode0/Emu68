@@ -5,8 +5,8 @@
 
 #define _GNU_SOURCE
 
-#include "support.h"
-#include "tlsf.h"
+#include "../include/support.h"
+#include "../include/tlsf.h"
 
 #undef USE_MACROS
 

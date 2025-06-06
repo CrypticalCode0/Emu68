@@ -1,7 +1,7 @@
 extern "C" {
 
-#include "support.h"
-#include "tlsf.h"
+#include "../include/support.h"
+#include "../include/tlsf.h"
 
 }
 

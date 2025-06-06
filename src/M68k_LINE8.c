@@ -7,11 +7,11 @@
     with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-#include "A64.h"
-#include "support.h"
-#include "M68k.h"
-#include "RegisterAllocator.h"
-#include "cache.h"
+#include "../include/A64.h"
+#include "../include/support.h"
+#include "../include/M68k.h"
+#include "../include/RegisterAllocator.h"
+#include "../include/cache.h"
 
 uint32_t *EMIT_MUL_DIV(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr);
 static uint32_t *EMIT_MUL_DIV_(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
@@ -37,7 +37,7 @@ uint32_t *EMIT_PACK_reg(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     {
         uint8_t an_src = RA_MapM68kRegister(&ptr, 8 + (opcode & 7));
         tmp = RA_AllocARMRegister(&ptr);
-        
+
         *ptr++ = ldrsh_offset_preindex(an_src, tmp, -2);
 
         RA_SetDirtyM68kRegister(&ptr, 8 + (opcode & 7));
@@ -368,7 +368,7 @@ kprintf("[ERROR] SBCD is not yet fixed!!!\n");
     // Subtract nibbles
     *ptr++ = sub_reg(tmp_a, tmp_b, tmp_a, LSL, 0);
     *ptr++ = sub_reg(tmp_c, tmp_d, tmp_c, LSL, 0);
-    
+
     // Extract 8-bit src into tmp_b and perform subtraction on tmp_n test reg
     *ptr++ = and_immed(tmp_b, src, 8, 0);
     *ptr++ = sub_reg(tmp_n, tmp_n, tmp_b, LSL, 0);
@@ -473,7 +473,7 @@ kprintf("[ERROR] SBCD mem is not yet fixed!\n");
     // Subtract nibbles
     *ptr++ = sub_reg(tmp_a, tmp_b, tmp_a, LSL, 0);
     *ptr++ = sub_reg(tmp_c, tmp_d, tmp_c, LSL, 0);
-    
+
     // Perform subtraction on tmp_n test reg
     *ptr++ = sub_reg(tmp_n, tmp_n, src, LSL, 0);
 
@@ -549,24 +549,24 @@ static struct OpcodeDef InsnTable[512] = {
     [0200 ... 0207] = { { EMIT_OR_reg }, NULL, 0, SR_NZVC, 1, 0, 4 },
     [0220 ... 0247] = { { EMIT_OR_mem }, NULL, 0, SR_NZVC, 1, 0, 4 },
     [0250 ... 0274] = { { EMIT_OR_ext }, NULL, 0, SR_NZVC, 1, 1, 4 },
- 
+
     [0300 ... 0307] = { { EMIT_DIVU_reg }, NULL, 0, SR_NZVC, 1, 0, 2 },  //D0 Destination, DIVU.W
     [0320 ... 0347] = { { EMIT_DIVU_mem }, NULL, 0, SR_NZVC, 1, 0, 2 },
     [0350 ... 0374] = { { EMIT_DIVU_ext }, NULL, 0, SR_NZVC, 1, 1, 2 },
- 
+
     [0400 ... 0407] = { { EMIT_SBCD_reg }, NULL, SR_XZ, SR_XZC, 1, 0, 1 },
     [0410 ... 0417] = { { EMIT_SBCD_mem }, NULL, SR_XZ, SR_XZC, 1, 0, 1 },  //R0 Destination
     [0420 ... 0447] = { { EMIT_OR_mem }, NULL, 0, SR_NZVC, 1, 0, 1 },
     [0450 ... 0471] = { { EMIT_OR_ext }, NULL, 0, SR_NZVC, 1, 1, 1 },    //D0 Source
- 
+
     [0500 ... 0507] = { { EMIT_PACK_reg }, NULL, 0, 0, 2, 0, 2 },
     [0510 ... 0517] = { { EMIT_PACK_mem }, NULL, 0, 0, 2, 0, 2 },  //_ext,//R0 Destination, 020 and UP only, fetches another Word.(16-bit adjustment)
-    [0520 ... 0547] = { { EMIT_OR_mem }, NULL, 0, SR_NZVC, 1, 0, 2 }, 
+    [0520 ... 0547] = { { EMIT_OR_mem }, NULL, 0, SR_NZVC, 1, 0, 2 },
     [0550 ... 0571] = { { EMIT_OR_ext }, NULL, 0, SR_NZVC, 1, 1, 2 },
- 
+
     [0600 ... 0607] = { { EMIT_UNPK_reg }, NULL, 0, 0, 2, 0, 2 },
     [0610 ... 0617] = { { EMIT_UNPK_mem }, NULL, 0, 0, 2, 0, 2 },  //_ext,//R0 Destination, 020 and UP only, fetches another Word.(16-bit adjustment)
-    [0620 ... 0647] = { { EMIT_OR_mem }, NULL, 0, SR_NZVC, 1, 0, 4 }, 
+    [0620 ... 0647] = { { EMIT_OR_mem }, NULL, 0, SR_NZVC, 1, 0, 4 },
     [0650 ... 0671] = { { EMIT_OR_ext }, NULL, 0, SR_NZVC, 1, 1, 4 },
 
     [0700 ... 0707] = { { EMIT_DIVS_reg }, NULL, 0, SR_NZVC, 1, 0, 2 },  //D0 Destination, DIVS.W
@@ -616,7 +616,7 @@ uint32_t GetSR_Line8(uint16_t opcode)
 int M68K_GetLine8Length(uint16_t *insn_stream)
 {
     uint16_t opcode = cache_read_16(ICACHE, (uintptr_t)insn_stream);
-    
+
     int length = 0;
     int need_ea = 0;
     int opsize = 0;

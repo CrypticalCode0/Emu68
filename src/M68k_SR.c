@@ -7,10 +7,10 @@
     with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-#include "support.h"
-#include "M68k.h"
-#include "EmuFeatures.h"
-#include "cache.h"
+#include "../include/support.h"
+#include "../include/M68k.h"
+#include "../include/EmuFeatures.h"
+#include "../include/cache.h"
 
 uint8_t SR_GetEALength(uint16_t *insn_stream, uint8_t ea, uint8_t imm_size)
 {
@@ -147,7 +147,7 @@ int M68K_GetMoveLength(uint16_t *insn_stream)
 
     length += SR_GetEALength(&insn_stream[length], ea, size);
 
-    return length;    
+    return length;
 }
 
 int M68K_GetLineFLength(uint16_t *insn_stream)
@@ -196,15 +196,15 @@ int M68K_GetLineFLength(uint16_t *insn_stream)
                 case 1:
                     opsize = 2;
                     break;
-                
+
                 case 2:
                     opsize = 6;
                     break;
-                
+
                 case 3:     // Packed!!
                     opsize = 6;
                     break;
-                
+
                 case 4:
                 case 6:
                     opsize = 1;
@@ -229,15 +229,15 @@ int M68K_GetLineFLength(uint16_t *insn_stream)
                 case 1:
                     opsize = 2;
                     break;
-                
+
                 case 2:
                     opsize = 6;
                     break;
-                
+
                 case 3:     // Packed!!
                     opsize = 6;
                     break;
-                
+
                 case 4:
                 case 6:
                     opsize = 1;
@@ -274,15 +274,15 @@ int M68K_GetLineFLength(uint16_t *insn_stream)
                 case 1:
                     opsize = 2;
                     break;
-                
+
                 case 2:
                     opsize = 6;
                     break;
-                
+
                 case 3:     // Packed!!
                     opsize = 6;
                     break;
-                
+
                 case 4:
                 case 6:
                     opsize = 1;
@@ -307,15 +307,15 @@ int M68K_GetLineFLength(uint16_t *insn_stream)
                 case 1:
                     opsize = 2;
                     break;
-                
+
                 case 2:
                     opsize = 6;
                     break;
-                
+
                 case 3:     // Packed!!
                     opsize = 6;
                     break;
-                
+
                 case 4:
                 case 6:
                     opsize = 1;
@@ -340,15 +340,15 @@ int M68K_GetLineFLength(uint16_t *insn_stream)
                 case 1:
                     opsize = 2;
                     break;
-                
+
                 case 2:
                     opsize = 6;
                     break;
-                
+
                 case 3:     // Packed!!
                     opsize = 6;
                     break;
-                
+
                 case 4:
                 case 6:
                     opsize = 1;
@@ -373,15 +373,15 @@ int M68K_GetLineFLength(uint16_t *insn_stream)
                 case 1:
                     opsize = 2;
                     break;
-                
+
                 case 2:
                     opsize = 6;
                     break;
-                
+
                 case 3:     // Packed!!
                     opsize = 6;
                     break;
-                
+
                 case 4:
                 case 6:
                     opsize = 1;
@@ -406,15 +406,15 @@ int M68K_GetLineFLength(uint16_t *insn_stream)
                 case 1:
                     opsize = 2;
                     break;
-                
+
                 case 2:
                     opsize = 6;
                     break;
-                
+
                 case 3:     // Packed!!
                     opsize = 6;
                     break;
-                
+
                 case 4:
                 case 6:
                     opsize = 1;
@@ -439,15 +439,15 @@ int M68K_GetLineFLength(uint16_t *insn_stream)
                 case 1:
                     opsize = 2;
                     break;
-                
+
                 case 2:
                     opsize = 6;
                     break;
-                
+
                 case 3:     // Packed!!
                     opsize = 6;
                     break;
-                
+
                 case 4:
                 case 6:
                     opsize = 1;
@@ -470,16 +470,16 @@ int M68K_GetLineFLength(uint16_t *insn_stream)
             case 1:
                 opsize = 2;
                 break;
-            
+
             case 2:
                 opsize = 6;
                 break;
-            
+
             case 3:     // Packed!!
             case 7:
                 opsize = 6;
                 break;
-            
+
             case 4:
             case 6:
                 opsize = 1;
@@ -523,15 +523,15 @@ int M68K_GetLineFLength(uint16_t *insn_stream)
                 case 1:
                     opsize = 2;
                     break;
-                
+
                 case 2:
                     opsize = 6;
                     break;
-                
+
                 case 3:     // Packed!!
                     opsize = 6;
                     break;
-                
+
                 case 4:
                 case 6:
                     opsize = 1;
@@ -556,15 +556,15 @@ int M68K_GetLineFLength(uint16_t *insn_stream)
                 case 1:
                     opsize = 2;
                     break;
-                
+
                 case 2:
                     opsize = 6;
                     break;
-                
+
                 case 3:     // Packed!!
                     opsize = 6;
                     break;
-                
+
                 case 4:
                 case 6:
                     opsize = 1;
@@ -589,15 +589,15 @@ int M68K_GetLineFLength(uint16_t *insn_stream)
                 case 1:
                     opsize = 2;
                     break;
-                
+
                 case 2:
                     opsize = 6;
                     break;
-                
+
                 case 3:     // Packed!!
                     opsize = 6;
                     break;
-                
+
                 case 4:
                 case 6:
                     opsize = 1;
@@ -629,15 +629,15 @@ int M68K_GetLineFLength(uint16_t *insn_stream)
                 case 1:
                     opsize = 2;
                     break;
-                
+
                 case 2:
                     opsize = 6;
                     break;
-                
+
                 case 3:     // Packed!!
                     opsize = 6;
                     break;
-                
+
                 case 4:
                 case 6:
                     opsize = 1;
@@ -662,15 +662,15 @@ int M68K_GetLineFLength(uint16_t *insn_stream)
                 case 1:
                     opsize = 2;
                     break;
-                
+
                 case 2:
                     opsize = 6;
                     break;
-                
+
                 case 3:     // Packed!!
                     opsize = 6;
                     break;
-                
+
                 case 4:
                 case 6:
                     opsize = 1;
@@ -695,15 +695,15 @@ int M68K_GetLineFLength(uint16_t *insn_stream)
                 case 1:
                     opsize = 2;
                     break;
-                
+
                 case 2:
                     opsize = 6;
                     break;
-                
+
                 case 3:     // Packed!!
                     opsize = 6;
                     break;
-                
+
                 case 4:
                 case 6:
                     opsize = 1;
@@ -728,15 +728,15 @@ int M68K_GetLineFLength(uint16_t *insn_stream)
                 case 1:
                     opsize = 2;
                     break;
-                
+
                 case 2:
                     opsize = 6;
                     break;
-                
+
                 case 3:     // Packed!!
                     opsize = 6;
                     break;
-                
+
                 case 4:
                 case 6:
                     opsize = 1;
@@ -883,7 +883,7 @@ uint8_t M68K_GetSRMask(uint16_t *insn_stream)
         of scan is not exceeded
     */
     while(mask != 0 && scan_depth < max_scan_depth)
-    {      
+    {
         /* Increase scan depth level */
         scan_depth++;
 
@@ -1027,18 +1027,18 @@ uint8_t M68K_GetSRMask(uint16_t *insn_stream)
 
                 return mask1 | needed1 | mask2 | needed2;
             }
-            else 
+            else
             {
                 D(kprintf("[JIT]   %02d: check breaks on branch\n", scan_depth));
                 break;
             }
         }
-        else          
+        else
         {
             /* Advance to subsequent instruction */
             insn_stream += M68K_GetINSNLength(insn_stream);
         }
-        
+
         /* Get opcode */
         opcode = cache_read_16(ICACHE, (uint32_t)(uintptr_t)insn_stream);
         D(kprintf("[JIT]   %02d: opcode=%04x @ %08x ", scan_depth, opcode, insn_stream));

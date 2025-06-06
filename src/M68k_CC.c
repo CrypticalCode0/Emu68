@@ -8,9 +8,9 @@
     with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-#include "support.h"
-#include "M68k.h"
-#include "RegisterAllocator.h"
+#include "../include/support.h"
+#include "../include/M68k.h"
+#include "../include/RegisterAllocator.h"
 
 uint32_t * EMIT_JumpOnCondition(uint32_t *ptr, uint8_t m68k_condition, uint32_t distance)
 {

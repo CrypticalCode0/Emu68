@@ -7,10 +7,10 @@
     with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-#include "support.h"
-#include "M68k.h"
-#include "RegisterAllocator.h"
-#include "cache.h"
+#include "../include/support.h"
+#include "../include/M68k.h"
+#include "../include/RegisterAllocator.h"
+#include "../include/cache.h"
 
 uint32_t *EMIT_moveq(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed)
 {
@@ -173,7 +173,7 @@ uint32_t *EMIT_move(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed)
                     *ptr++ = stp_preindex(addr_reg, src_reg_2, src_reg_1, -8);
 
                     tmp_reg = src_reg_2;
-                
+
                     done = 1;
                     ptr = EMIT_AdvancePC(ptr, 4);
                     *insn_consumed = 2;
@@ -194,7 +194,7 @@ uint32_t *EMIT_move(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed)
                 uint8_t addr_reg = RA_MapM68kRegisterForWrite(&ptr, ((opcode >> 9) & 7) + 8);
                 uint8_t src_reg_1 = RA_MapM68kRegister(&ptr, opcode & 0xf);
                 uint8_t src_reg_2 = RA_MapM68kRegister(&ptr, opcode2 & 0xf);
-                
+
                 /* Merging not allowed if any of the registers stored is also address register */
                 if (!(src_reg_1 == addr_reg || src_reg_2 == addr_reg))
                 {
@@ -211,7 +211,7 @@ uint32_t *EMIT_move(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed)
                     *ptr++ = stp_postindex(addr_reg, src_reg_1, src_reg_2, 8);
 
                     tmp_reg = src_reg_2;
-                
+
                     done = 1;
                     ptr = EMIT_AdvancePC(ptr, 4);
                     *insn_consumed = 2;
@@ -243,7 +243,7 @@ uint32_t *EMIT_move(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed)
                     {
                         /* Two subsequent register moves from (An)+ */
                         (*m68k_ptr)+=2;
-                        
+
                         *ptr++ = ldp_postindex(addr_reg, dst_reg_1, dst_reg_2, 8);
 
                         if (!is_movea2) {
@@ -261,7 +261,7 @@ uint32_t *EMIT_move(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed)
                         }
 
                         is_movea = is_movea && is_movea2;
-                                
+
                         done = 1;
                         ptr = EMIT_AdvancePC(ptr, 4);
                         *insn_consumed = 2;
@@ -312,7 +312,7 @@ uint32_t *EMIT_move(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed)
                         }
 
                         is_movea = is_movea && is_movea2;
-                    
+
                         done = 1;
                         ptr = EMIT_AdvancePC(ptr, 4);
                         *insn_consumed = 2;
@@ -344,7 +344,7 @@ uint32_t *EMIT_move(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed)
         if ((tmp & 0x38) == 0)
         {
             uint16_t opcode2 = cache_read_16(ICACHE, (uintptr_t)&(*m68k_ptr)[move_length - 1]);
-            
+
             /* Check if subsequent instruction is extb.l on the same target reg */
             if (size == 1 && (opcode2 & 0xfff8) == 0x49c0 && (opcode2 & 7) == (tmp & 7))
             {
@@ -531,7 +531,7 @@ uint32_t GetSR_Line1(uint16_t opcode)
         kprintf("Undefined Line1\n");
         return SR_CCR << 16;
     }
-    
+
     /* Normal move case: destination allows highest mode + reg of 071 */
     if ((opcode & 0x01c0) == 0x01c0 && (opcode & 0x0e00) > 0x0200) {
         kprintf("Undefined Line1\n");

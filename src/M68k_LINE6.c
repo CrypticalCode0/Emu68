@@ -7,11 +7,11 @@
     with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-#include "config.h"
-#include "support.h"
-#include "M68k.h"
-#include "RegisterAllocator.h"
-#include "cache.h"
+#include "../include/config.h"
+#include "../include/support.h"
+#include "../include/M68k.h"
+#include "../include/RegisterAllocator.h"
+#include "../include/cache.h"
 
 extern struct M68KState *__m68k_state;
 extern uint16_t * m68k_entry_point;
@@ -154,7 +154,7 @@ uint32_t *EMIT_Bcc(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     (void)take_branch;
     (void)tmpptr;
     (void)distance_ptr;
-    
+
     uint8_t success_condition = EMIT_TestCondition(&ptr, m68k_condition);
     uint8_t pc_yes = RA_AllocARMRegister(&ptr);
     uint8_t pc_no = RA_AllocARMRegister(&ptr);
@@ -169,7 +169,7 @@ uint32_t *EMIT_Bcc(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
             *ptr++ = movt_immed_u16(0, (branch_offset >> 16) & 0xffff);
         *ptr++ = add_reg(pc_yes, REG_PC, 0, LSL, 0);
     }
-    else { 
+    else {
         RA_FreeARMRegister(&ptr, pc_yes);
         pc_yes = REG_PC;
     }
@@ -390,7 +390,7 @@ int M68K_GetLine6Length(uint16_t *insn_stream)
 {
     uint16_t opcode = cache_read_16(ICACHE, (uintptr_t)insn_stream);
     int length = 1;
-    
+
     if ((opcode & 0xff) == 0) {
         length = 2;
     }

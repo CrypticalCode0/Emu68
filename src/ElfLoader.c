@@ -7,9 +7,9 @@
     with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-#include "support.h"
-#include "DuffCopy.h"
-#include "ElfLoader.h"
+#include "../include/support.h"
+#include "../include/DuffCopy.h"
+#include "../include/ElfLoader.h"
 #include <stdint.h>
 #include <stddef.h>
 
@@ -153,7 +153,7 @@ typedef struct {
 typedef struct {
     Elf32_Addr  r_offset;
     Elf32_Word  r_info;
-    Elf32_Sword r_addend; 
+    Elf32_Sword r_addend;
 } Elf32_Rela;
 
 #define ELF32_R_SYM(i) ((i)>>8)
@@ -229,7 +229,7 @@ int GetElfSize(void *file, uint32_t *size_rw, uint32_t *size_ro)
     {
         return 0;
     }
-    
+
     D(kprintf(": ro=%p, rw=%p\n", s_ro, s_rw));
 
     if (size_ro)
@@ -246,31 +246,31 @@ static uintptr_t ptr_rw;
 static int loadHunk(void *mem, Elf32_Shdr *sh)
 {
     void *ptr = (void *)0;
-        
+
     /* empty chunk? Who cares :) */
-    if (!sh->sh_size) 
+    if (!sh->sh_size)
         return 1;
-        
+
     /* Allocate a chunk with write access */
     if (sh->sh_flags & SHF_WRITE)
-    {       
+    {
         ptr_rw = (ptr_rw + (uintptr_t)sh->sh_addralign - 1) & ~((uintptr_t)sh->sh_addralign - 1);
         ptr = (void *)ptr_rw;
         ptr_rw = ptr_rw + sh->sh_size;
     }
-    else    
-    {       
+    else
+    {
         /* Read-Only mode? Get the memory from the kernel space, align it accorting to the demand */
         ptr_ro = (ptr_ro + (uintptr_t)sh->sh_addralign - 1) & ~((uintptr_t)sh->sh_addralign - 1);
         ptr = (void *)ptr_ro;
         ptr_ro = ptr_ro + sh->sh_size;
     }
-        
+
     sh->sh_addr = (uintptr_t)ptr;
-        
+
     /* copy block of memory from ELF file if it exists */
     if (sh->sh_type != SHT_NOBITS)
-    {       
+    {
         memcpy(ptr, (void*)((uintptr_t)mem + sh->sh_offset), sh->sh_size);
     }
     else
@@ -287,7 +287,7 @@ static int relocate(Elf32_Ehdr *eh, Elf32_Shdr *sh, int shrel_idx)
     Elf32_Shdr *shrel = &sh[shrel_idx];
     Elf32_Shdr *shsymtab = &sh[shrel->sh_link];
     Elf32_Shdr *toreloc = &sh[shrel->sh_info];
-        
+
     int is_exec = (eh->e_type == ET_EXEC);
 
     Elf32_Sym *symtab = (Elf32_Sym *)(uintptr_t)shsymtab->sh_addr;
@@ -319,16 +319,16 @@ static int relocate(Elf32_Ehdr *eh, Elf32_Shdr *sh, int shrel_idx)
                                         (char *)(uintptr_t)(sh[eh->e_shstrndx].sh_addr) +
                                         toreloc->sh_name);
                 continue; //return 0;
-                
+
             case SHN_COMMON:
                 kprintf("[ELF] COMMON symbol '%s' in section '%s'\n",
                                         (char *)(uintptr_t)(sh[shsymtab->sh_link].sh_addr) +
                                         sym->st_name,
                                         (char *)(uintptr_t)(sh[eh->e_shstrndx].sh_addr) +
                                         toreloc->sh_name);
-                        
+
                 return 0;
-                
+
             case SHN_ABS:
                 if (SysBase_sym == (void *)0) {
                     if (strcmp((char *)(uintptr_t)(sh[shsymtab->sh_link].sh_addr) + sym->st_name, "SysBase") == 0) {
@@ -402,7 +402,7 @@ void * LoadELFFile(void *mem, void *load_address)
                 {
                     if (sh[i].sh_size)
                     {
-                        D(kprintf("[ELF] %s section loaded at %08x\n", 
+                        D(kprintf("[ELF] %s section loaded at %08x\n",
                                   sh[i].sh_flags & SHF_WRITE ? "RW":"RO",
                                   (void*)(intptr_t)(sh[i].sh_addr)));
                     }

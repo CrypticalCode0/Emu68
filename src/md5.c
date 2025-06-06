@@ -1,6 +1,6 @@
 #include <stdint.h>
-#include "md5.h"
-#include "support.h"
+#include "../include/md5.h"
+#include "../include/support.h"
 
 static const uint8_t s[] = { 7, 12, 17, 22,  7, 12, 17, 22,  7, 12, 17, 22,  7, 12, 17, 22,
     5,  9, 14, 20,  5,  9, 14, 20,  5,  9, 14, 20,  5,  9, 14, 20,
@@ -107,7 +107,7 @@ struct MD5 CalcMD5(void *_start, void *_end)
     return md;
 }
 
-#include "cache.h"
+#include "../include/cache.h"
 
 uint32_t CalcCRC32(void *_start, void *_end)
 {

@@ -7,10 +7,10 @@
     with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-#include "support.h"
-#include "M68k.h"
-#include "RegisterAllocator.h"
-#include "cache.h"
+#include "../include/support.h"
+#include "../include/M68k.h"
+#include "../include/RegisterAllocator.h"
+#include "../include/cache.h"
 
 static uint32_t *EMIT_CMPA(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
 __attribute__((alias("EMIT_CMPA_reg")));
@@ -41,11 +41,11 @@ static uint32_t *EMIT_CMPA_ext(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_p
     if (update_mask)
     {
         uint8_t cc = RA_ModifyCC(&ptr);
-        
+
         if (__builtin_popcount(update_mask) != 0)
         {
             ptr = EMIT_GetNZnCV(ptr, cc, &update_mask);
-            
+
             if (update_mask & SR_Z)
                 ptr = EMIT_SetFlagsConditional(ptr, cc, SR_Z, ARM_CC_EQ);
             if (update_mask & SR_N)
@@ -112,11 +112,11 @@ static uint32_t *EMIT_CMPM(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     if (update_mask)
     {
         uint8_t cc = RA_ModifyCC(&ptr);
-        
+
         if (__builtin_popcount(update_mask) != 0)
         {
             ptr = EMIT_GetNZnCV(ptr, cc, &update_mask);
-            
+
             if (update_mask & SR_Z)
                 ptr = EMIT_SetFlagsConditional(ptr, cc, SR_Z, ARM_CC_EQ);
             if (update_mask & SR_N)
@@ -416,7 +416,7 @@ static struct OpcodeDef InsnTable[512] = {
     [0300 ... 0317] = { { EMIT_CMPA_reg }, NULL, 0, SR_NZVC, 1, 0, 2 }, //A0, Word
     [0320 ... 0347] = { { EMIT_CMPA_mem }, NULL, 0, SR_NZVC, 1, 0, 2 }, //(An)
     [0350 ... 0374] = { { EMIT_CMPA_ext }, NULL, 0, SR_NZVC, 1, 1, 2 }, //memory indirect
- 
+
     [0400 ... 0407] = { { EMIT_EOR_reg }, NULL, 0, SR_NZVC, 1, 0, 1 }, //D0, Byte
     [0410 ... 0417] = { { EMIT_CMPM }, NULL, 0, SR_NZVC, 1, 0, 1 },
     [0420 ... 0447] = { { EMIT_EOR_mem }, NULL, 0, SR_NZVC, 1, 0, 1 },
@@ -479,7 +479,7 @@ uint32_t GetSR_LineB(uint16_t opcode)
 int M68K_GetLineBLength(uint16_t *insn_stream)
 {
     uint16_t opcode = cache_read_16(ICACHE, (uintptr_t)insn_stream);
-    
+
     int length = 0;
     int need_ea = 0;
     int opsize = 0;

@@ -7,10 +7,10 @@
     with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-#include "support.h"
-#include "M68k.h"
-#include "RegisterAllocator.h"
-#include "cache.h"
+#include "../include/support.h"
+#include "../include/M68k.h"
+#include "../include/RegisterAllocator.h"
+#include "../include/cache.h"
 
 uint32_t *EMIT_CMPI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
 {
@@ -28,36 +28,21 @@ uint32_t *EMIT_CMPI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     {
         case 0x0000:    /* Byte operation */
             lo16 = cache_read_16(ICACHE, (uintptr_t)&(*m68k_ptr)[ext_count++]);
-#ifdef __aarch64__
             *ptr++ = mov_immed_u16(immed, (lo16 & 0xff) << 8, 1);
-#else
-            *ptr++ = mov_immed_u8_shift(immed, lo16 & 0xff, 4);
-#endif
             size = 1;
             break;
         case 0x0040:    /* Short operation */
             lo16 = cache_read_16(ICACHE, (uintptr_t)&(*m68k_ptr)[ext_count++]);
-#ifdef __aarch64__
             *ptr++ = mov_immed_u16(immed, lo16, 1);
-#else
-            if (lo16 <= 0xff)
-                *ptr++ = mov_immed_u8_shift(immed, lo16 & 0xff, 8);
-            else {
-                *ptr++ = sub_reg(immed, immed, immed, 0);
-                *ptr++ = movt_immed_u16(immed, lo16);
-            }
-#endif
             size = 2;
             break;
         case 0x0080:    /* Long operation */
             u32 = cache_read_16(ICACHE, (uintptr_t)&(*m68k_ptr)[ext_count++]) << 16;
             u32 |= cache_read_16(ICACHE, (uintptr_t)&(*m68k_ptr)[ext_count++]);
-            if (u32 < 4096)
-            {
+            if (u32 < 4096) {
                 immediate = 1;
             }
-            else
-            {
+            else {
                 *ptr++ = movw_immed_u16(immed, u32 & 0xffff);
                 if (((u32 >> 16) & 0xffff) != 0)
                     *ptr++ = movt_immed_u16(immed, u32 >> 16);
@@ -74,9 +59,7 @@ uint32_t *EMIT_CMPI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
         uint8_t tmpreg = RA_AllocARMRegister(&ptr);
 
         /* Perform add operation */
-        switch (size)
-        {
-#ifdef __aarch64__
+        switch (size) {
             case 4:
                 if (immediate)
                     *ptr++ = cmp_immed(dest, u32);
@@ -91,17 +74,6 @@ uint32_t *EMIT_CMPI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                 *ptr++ = lsl(tmpreg, dest, 24);
                 *ptr++ = cmp_reg(tmpreg, immed, LSL, 0);
                 break;
-#else
-            case 4:
-                *ptr++ = adds_reg(immed, immed, dest, 0);
-                break;
-            case 2:
-                *ptr++ = adds_reg(immed, immed, dest, 16);
-                break;
-            case 1:
-                *ptr++ = adds_reg(immed, immed, dest, 24);
-                break;
-#endif
         }
         RA_FreeARMRegister(&ptr, tmpreg);
     }
@@ -112,9 +84,7 @@ uint32_t *EMIT_CMPI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
         uint8_t tmpreg = RA_AllocARMRegister(&ptr);
 
         /* Fetch data into temporary register, perform add, store it back */
-        switch (size)
-        {
-#ifdef __aarch64__
+        switch (size) {
         case 4:
             /* Perform calcualtion */
             if (immediate)
@@ -132,20 +102,6 @@ uint32_t *EMIT_CMPI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
             *ptr++ = lsl(tmpreg, dest, 24);
             *ptr++ = cmp_reg(tmpreg, immed, LSL, 0);
             break;
-#else
-        case 4:
-            /* Perform calcualtion */
-            *ptr++ = adds_reg(immed, immed, dest, 0);
-            break;
-        case 2:
-            /* Perform calcualtion */
-            *ptr++ = adds_reg(immed, immed, dest, 16);
-            break;
-        case 1:
-            /* Perform calcualtion */
-            *ptr++ = adds_reg(immed, immed, dest, 24);
-            break;
-#endif
         }
 
         RA_FreeARMRegister(&ptr, tmpreg);
@@ -186,8 +142,7 @@ uint32_t *EMIT_SUBI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     int immediate = 0;
 
     /* Load immediate into the register */
-    switch (opcode & 0x00c0)
-    {
+    switch (opcode & 0x00c0) {
         case 0x0000:    /* Byte operation */
             lo16 = cache_read_16(ICACHE, (uintptr_t)&(*m68k_ptr)[ext_count++]) & 0xff;
             if (!(update_mask == 0)) {
@@ -205,8 +160,7 @@ uint32_t *EMIT_SUBI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
         case 0x0080:    /* Long operation */
             u32 = cache_read_16(ICACHE, (uintptr_t)&(*m68k_ptr)[ext_count++]) << 16;
             u32 |= cache_read_16(ICACHE, (uintptr_t)&(*m68k_ptr)[ext_count++]);
-            if (u32 < 4096)
-            {
+            if (u32 < 4096) {
                 immediate = 1;
             }
             else {
@@ -231,9 +185,7 @@ uint32_t *EMIT_SUBI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
         RA_SetDirtyM68kRegister(&ptr, opcode & 7);
 
         /* Perform add operation */
-        switch (size)
-        {
-#ifdef __aarch64__
+        switch (size) {
             case 4:
                 if (immediate)
                     *ptr++ = subs_immed(dest, dest, u32 & 0xffff);
@@ -250,7 +202,7 @@ uint32_t *EMIT_SUBI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                         else
                             *ptr++ = sub_immed_lsl12(temp, dest, lo16 >> 12);
                     }
-                        
+
                     *ptr++ = bfxil(dest, temp, 0, 16);
                 }
                 else {
@@ -282,21 +234,6 @@ uint32_t *EMIT_SUBI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                     *ptr++ = bfxil(dest, temp, 24, 8);
                 }
                 break;
-#else
-            case 4:
-                *ptr++ = adds_reg(dest, dest, immed, 0);
-                break;
-            case 2:
-                *ptr++ = adds_reg(immed, immed, dest, 16);
-                *ptr++ = lsr_immed(immed, immed, 16);
-                *ptr++ = bfi(dest, immed, 0, 16);
-                break;
-            case 1:
-                *ptr++ = adds_reg(immed, immed, dest, 24);
-                *ptr++ = lsr_immed(immed, immed, 24);
-                *ptr++ = bfi(dest, immed, 0, 8);
-                break;
-#endif
         }
 
         RA_FreeARMRegister(&ptr, temp);
@@ -325,14 +262,10 @@ uint32_t *EMIT_SUBI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                 *ptr++ = ldr_offset(dest, tmp, 0);
 
             /* Perform calcualtion */
-#ifdef __aarch64__
             if (immediate)
                 *ptr++ = subs_immed(immed, tmp, u32);
             else
                 *ptr++ = subs_reg(immed, tmp, immed, LSL, 0);
-#else
-            *ptr++ = adds_reg(immed, immed, tmp, 0);
-#endif
             /* Store back */
             if (mode == 3)
             {
@@ -351,8 +284,7 @@ uint32_t *EMIT_SUBI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
             else
                 *ptr++ = ldrh_offset(dest, tmp, 0);
             /* Perform calcualtion */
-#ifdef __aarch64__
-            if (update_mask == 0) {               
+            if (update_mask == 0) {
                 if (lo16 & 0xfff || lo16 == 0)
                     *ptr++ = sub_immed(immed, tmp, lo16 & 0xfff);
                 if (lo16 & 0xf000) {
@@ -360,7 +292,7 @@ uint32_t *EMIT_SUBI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                         *ptr++ = sub_immed_lsl12(immed, immed, lo16 >> 12);
                     else
                         *ptr++ = sub_immed_lsl12(immed, tmp, lo16 >> 12);
-                }   
+                }
             }
             else {
                 if (update_mask == SR_N) {
@@ -373,10 +305,6 @@ uint32_t *EMIT_SUBI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                 *ptr++ = subs_reg(immed, tmp, immed, LSL, 0);
                 *ptr++ = lsr(immed, immed, 16);
             }
-#else
-            *ptr++ = adds_reg(immed, immed, tmp, 16);
-            *ptr++ = lsr_immed(immed, immed, 16);
-#endif
             /* Store back */
             if (mode == 3)
             {
@@ -395,7 +323,6 @@ uint32_t *EMIT_SUBI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
             else
                 *ptr++ = ldrb_offset(dest, tmp, 0);
             /* Perform calcualtion */
-#ifdef __aarch64__
             if (update_mask == 0) {
                 *ptr++ = sub_immed(immed, tmp, lo16 & 0xff);
             }
@@ -410,10 +337,6 @@ uint32_t *EMIT_SUBI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                 *ptr++ = subs_reg(immed, tmp, immed, LSL, 0);
                 *ptr++ = lsr(immed, immed, 24);
             }
-#else
-            *ptr++ = adds_reg(immed, immed, tmp, 24);
-            *ptr++ = lsr_immed(immed, immed, 24);
-#endif
             /* Store back */
             if (mode == 3)
             {
@@ -491,9 +414,7 @@ uint32_t *EMIT_ADDI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
         case 0x0080:    /* Long operation */
             u32 = cache_read_16(ICACHE, (uintptr_t)&(*m68k_ptr)[ext_count++]) << 16;
             u32 |= cache_read_16(ICACHE, (uintptr_t)&(*m68k_ptr)[ext_count++]);
-#ifdef __aarch64__
-            if (u32 < 4096)
-            {
+            if (u32 < 4096) {
                 add_immediate = 1;
             }
             else
@@ -507,11 +428,6 @@ uint32_t *EMIT_ADDI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                     *ptr++ = mov_immed_u16(immed, u32 >> 16, 1);
                 }
             }
-#else
-            *ptr++ = movw_immed_u16(immed, u32 & 0xffff);
-            if (((u32 >> 16) & 0xffff) != 0)
-                *ptr++ = movt_immed_u16(immed, u32 >> 16);
-#endif
             size = 4;
             break;
     }
@@ -526,9 +442,7 @@ uint32_t *EMIT_ADDI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
         RA_SetDirtyM68kRegister(&ptr, opcode & 7);
 
         /* Perform add operation */
-        switch(size)
-        {
-#ifdef __aarch64__
+        switch(size) {
             case 4:
                 if (add_immediate)
                     *ptr++ = adds_immed(dest, dest, u32);
@@ -574,21 +488,6 @@ uint32_t *EMIT_ADDI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                     *ptr++ = bfxil(dest, immed, 24, 8);
                 }
                 break;
-#else
-            case 4:
-                *ptr++ = adds_reg(dest, dest, immed, 0);
-                break;
-            case 2:
-                *ptr++ = adds_reg(immed, immed, dest, 16);
-                *ptr++ = lsr_immed(immed, immed, 16);
-                *ptr++ = bfi(dest, immed, 0, 16);
-                break;
-            case 1:
-                *ptr++ = adds_reg(immed, immed, dest, 24);
-                *ptr++ = lsr_immed(immed, immed, 24);
-                *ptr++ = bfi(dest, immed, 0, 8);
-                break;
-#endif
         }
     }
     else
@@ -615,14 +514,10 @@ uint32_t *EMIT_ADDI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                     *ptr++ = ldr_offset(dest, tmp, 0);
 
                 /* Perform calcualtion */
-#ifdef __aarch64__
                 if (add_immediate)
                     *ptr++ = adds_immed(immed, tmp, u32);
                 else
                     *ptr++ = adds_reg(immed, immed, tmp, LSL, 0);
-#else
-                *ptr++ = adds_reg(immed, immed, tmp, 0);
-#endif
                 /* Store back */
                 if (mode == 3)
                 {
@@ -641,7 +536,6 @@ uint32_t *EMIT_ADDI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                 else
                     *ptr++ = ldrh_offset(dest, tmp, 0);
                 /* Perform calcualtion */
-#ifdef __aarch64__
                 if (update_mask == 0) {
                     if (lo16 & 0xfff || lo16 == 0)
                         *ptr++ = add_immed(immed, tmp, lo16 & 0xfff);
@@ -662,10 +556,6 @@ uint32_t *EMIT_ADDI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                     *ptr++ = adds_reg(immed, immed, tmp, LSL, 16);
                     *ptr++ = lsr(immed, immed, 16);
                 }
-#else
-                *ptr++ = adds_reg(immed, immed, tmp, 16);
-                *ptr++ = lsr_immed(immed, immed, 16);
-#endif
                 /* Store back */
                 if (mode == 3)
                 {
@@ -789,9 +679,9 @@ uint32_t *EMIT_ORI_TO_SR(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
         val ^= 3;
 
     uint8_t cc = RA_ModifyCC(&ptr);
-    
+
     ptr = EMIT_FlushPC(ptr);
-    
+
     /* If supervisor is not active, put an exception here */
     tmp = ptr;
     ptr++;
@@ -801,14 +691,14 @@ uint32_t *EMIT_ORI_TO_SR(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     ptr++;
 
     /* Load immediate into the register */
-    *ptr++ = mov_immed_u16(immed, val & 0xf71f, 0); 
-    
+    *ptr++ = mov_immed_u16(immed, val & 0xf71f, 0);
+
     cc = RA_ModifyCC(&ptr);
 
     /* OR is here */
-    *ptr++ = mov_reg(changed, cc);   
+    *ptr++ = mov_reg(changed, cc);
     *ptr++ = orr_reg(cc, cc, immed, LSL, 0);
-    
+
     /* Check what has changed */
     *ptr++ = eor_reg(changed, changed, cc, LSL, 0);
 
@@ -816,8 +706,8 @@ uint32_t *EMIT_ORI_TO_SR(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     *ptr++ = tbz(changed, SRB_M, 7);
 
     /* Swap ISP/MSP */
-    *ptr++ = tbz(cc, SRB_M, 4); 
-    
+    *ptr++ = tbz(cc, SRB_M, 4);
+
     // M is not set now, Store MSP, load ISP
     *ptr++ = mov_reg_to_simd(31, TS_S, 3, sp);
     *ptr++ = mov_simd_to_reg(sp, 31, TS_S, 2);
@@ -829,7 +719,7 @@ uint32_t *EMIT_ORI_TO_SR(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
 
     // Advance PC
     *ptr++ = add_immed(REG_PC, REG_PC, 4);
-    
+
     // Check if IPL is less than 6. If yes, enable ARM interrupts
     *ptr++ = and_immed(changed, cc, 3, 32 - SRB_IPL);
     *ptr++ = cmp_immed(changed, 5 << SRB_IPL);
@@ -871,7 +761,7 @@ uint32_t *EMIT_ORI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                 mask32 = number_to_mask(lo16);
                 if (mask32 == 0 || mask32 == 0xffffffff) {
                     mask32 = 0;
-                    *ptr++ = mov_immed_u16(immed, lo16 & 0xff, 0);                    
+                    *ptr++ = mov_immed_u16(immed, lo16 & 0xff, 0);
                 }
             }
             else
@@ -1062,7 +952,7 @@ uint32_t *EMIT_ORI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                 }
                 else
                     *ptr++ = ldrb_offset(dest, tmp, 0);
-                
+
                 /* Perform calcualtion */
                 if (update_mask == 0) {
                     if (mask32 == 0)
@@ -1127,7 +1017,7 @@ uint32_t *EMIT_ANDI_TO_CCR(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     (void)opcode;
     uint8_t immed = RA_AllocARMRegister(&ptr);
     uint16_t val = cache_read_16(ICACHE, (uintptr_t)&(*m68k_ptr)[0]);
-   
+
     /* Swap C and V flags in immediate */
     if ((val & 3) != 0 && (val & 3) < 3)
         val ^= 3;
@@ -1164,7 +1054,7 @@ uint32_t *EMIT_ANDI_TO_SR(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
         val ^= 3;
 
     ptr = EMIT_FlushPC(ptr);
-    
+
     /* If supervisor is not active, put an exception here */
     tmp = ptr;
     ptr++;
@@ -1252,14 +1142,14 @@ uint32_t *EMIT_ANDI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                     else mask32 = 0;
                     if (mask32 == 0 || mask32 == 0xffffffff) {
                         mask32 = 0;
-                        *ptr++ = movn_immed_u16(immed, (~lo16) & 0xff, 0);                    
+                        *ptr++ = movn_immed_u16(immed, (~lo16) & 0xff, 0);
                     }
                 }
                 else {
                     mask32 = number_to_mask(lo16);
                     if (mask32 == 0 || mask32 == 0xffffffff) {
                         mask32 = 0;
-                        *ptr++ = mov_immed_u16(immed, (lo16 & 0xff), 0);                    
+                        *ptr++ = mov_immed_u16(immed, (lo16 & 0xff), 0);
                     }
                 }
             }
@@ -1272,7 +1162,7 @@ uint32_t *EMIT_ANDI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
             lo16 = cache_read_16(ICACHE, (uintptr_t)&(*m68k_ptr)[ext_count++]);
             if (update_mask == 0) {
                 if ((opcode & 0x0038) == 0) {
-                    if (lo16 != 0xffff) 
+                    if (lo16 != 0xffff)
                         mask32 = number_to_mask(0xffff0000 | lo16);
                     else
                         mask32 = 0;
@@ -1536,13 +1426,13 @@ uint32_t *EMIT_EORI_TO_SR(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     RA_SetDirtyM68kRegister(&ptr, 15);
 
     uint8_t cc = RA_ModifyCC(&ptr);
-    
+
     /* Swap C and V flags in immediate */
     if ((val & 3) != 0 && (val & 3) < 3)
         val ^= 3;
 
     ptr = EMIT_FlushPC(ptr);
-    
+
     /* If supervisor is not active, put an exception here */
     tmp = ptr;
     ptr++;
@@ -2308,7 +2198,7 @@ uint32_t *EMIT_CMP2(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     RA_FreeARMRegister(&ptr, tmp2);
 
     *exit_2 = b(ptr - exit_2);
-    *exit_1 = b(ptr - exit_1);  
+    *exit_1 = b(ptr - exit_1);
 
     (void)update_mask;
 
@@ -2449,7 +2339,7 @@ uint32_t *EMIT_BSET(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
 #else
             *ptr++ = and_immed(bit_number, bit_number, 7);
             *ptr++ = lsl_reg(bit_mask, bit_mask, bit_number);
-            
+
             tst_pos = ptr;
             *ptr++ = tst_reg(tmp, bit_mask, 0);
             *ptr++ = orr_reg(tmp, tmp, bit_mask, 0);
@@ -2675,7 +2565,7 @@ uint32_t *EMIT_CAS(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
             if (__builtin_popcount(update_mask) != 0)
             {
                 ptr = EMIT_GetNZnCV(ptr, cc, &update_mask);
-                
+
                 if (update_mask & SR_Z)
                     ptr = EMIT_SetFlagsConditional(ptr, cc, SR_Z, ARM_CC_EQ);
                 if (update_mask & SR_N)
@@ -2823,7 +2713,7 @@ uint32_t *EMIT_CAS(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
             if (__builtin_popcount(update_mask) != 0)
             {
                 ptr = EMIT_GetNZnCV(ptr, cc, &update_mask);
-                
+
                 if (update_mask & SR_Z)
                     ptr = EMIT_SetFlagsConditional(ptr, cc, SR_Z, ARM_CC_EQ);
                 if (update_mask & SR_N)
@@ -2920,7 +2810,7 @@ uint32_t *EMIT_MOVEP(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     /* Memory to register transfer */
     else {
         RA_SetDirtyM68kRegister(&ptr, (opcode >> 9) & 7);
-        
+
         /* Long mode */
         if (opcode & 0x40) {
             *ptr++ = ldrb_offset(addr, dn, offset);
@@ -2963,7 +2853,7 @@ uint32_t *EMIT_MOVES(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     uint32_t *tmp_priv;
     uint8_t ext_count = 1;
     uint8_t reg = RA_MapM68kRegister(&ptr, opcode2 >> 12);
-    
+
     size = size == 0 ? 1 : size == 1 ? 2 : 4;
 
     ptr = EMIT_FlushPC(ptr);
@@ -3023,7 +2913,7 @@ uint32_t *EMIT_MOVES(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                     case 1:
                         *ptr++ = bfi(reg, tmpreg, 0, 8);
                         break;
-                
+
                     case 2:
                         *ptr++ = bfi(reg, tmpreg, 0, 16);
                         break;
@@ -3338,7 +3228,7 @@ uint32_t GetSR_Line0(uint16_t opcode)
 int M68K_GetLine0Length(uint16_t *insn_stream)
 {
     uint16_t opcode = cache_read_16(ICACHE, (uintptr_t)&(*insn_stream));
-    
+
     int length = 0;
     int need_ea = 0;
     int opsize = 0;

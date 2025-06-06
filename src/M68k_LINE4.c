@@ -7,10 +7,10 @@
     with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-#include "support.h"
-#include "M68k.h"
-#include "RegisterAllocator.h"
-#include "cache.h"
+#include "../include/support.h"
+#include "../include/M68k.h"
+#include "../include/RegisterAllocator.h"
+#include "../include/cache.h"
 
 uint32_t *EMIT_MUL_DIV(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr);
 
@@ -568,7 +568,7 @@ uint32_t *EMIT_NEGX(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_
                             *ptr++ = tbz(tmp_2, 15, 2);
                             *ptr++ = orr_immed(cc, cc, 1, 31 & (32 - SRB_Valt));
                         }
-                        
+
                         if ((update_mask & SR_XC) == SR_XC)
                         {
                             *ptr++ = tbz(tmp, 16, 3);
@@ -616,7 +616,7 @@ uint32_t *EMIT_NEGX(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_
                             *ptr++ = tbz(tmp_2, 7, 2);
                             *ptr++ = orr_immed(cc, cc, 1, 31 & (32 - SRB_Valt));
                         }
-                        
+
                         if ((update_mask & SR_XC) == SR_XC)
                         {
                             *ptr++ = tbz(tmp, 8, 3);
@@ -708,7 +708,7 @@ uint32_t *EMIT_NEGX(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_
                     *ptr++ = tbz(tmp_2, 15, 2);
                     *ptr++ = orr_immed(cc, cc, 1, 31 & (32 - SRB_Valt));
                 }
-                
+
                 if ((update_mask & SR_XC) == SR_XC)
                 {
                     *ptr++ = tbz(tmp, 16, 3);
@@ -768,7 +768,7 @@ uint32_t *EMIT_NEGX(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_
                     *ptr++ = tbz(tmp_2, 7, 2);
                     *ptr++ = orr_immed(cc, cc, 1, 31 & (32 - SRB_Valt));
                 }
-                
+
                 if ((update_mask & SR_XC) == SR_XC)
                 {
                     *ptr++ = tbz(tmp, 8, 3);
@@ -788,7 +788,7 @@ uint32_t *EMIT_NEGX(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_
 #if 0
                 *ptr++ = bfxil(tmp_2, tmp, 2, 7);            // C at position 6, V at position 7
                 *ptr++ = bfxil(cc, tmp_2, 6, 2);
-                
+
                 if (update_mask & SR_X) {
                     *ptr++ = ror(0, cc, 1);
                     *ptr++ = bfi(cc, 0, 4, 1);
@@ -844,7 +844,7 @@ uint32_t *EMIT_NEGX(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_
 
         if (update_mask & SR_N)
             ptr = EMIT_SetFlagsConditional(ptr, cc, SR_N, ARM_CC_MI);
-        
+
         if (update_mask & SR_V)
             ptr = EMIT_SetFlagsConditional(ptr, cc, SR_Valt, ARM_CC_VS);
         if (update_mask & (SR_X | SR_C)) {
@@ -855,7 +855,7 @@ uint32_t *EMIT_NEGX(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, uint16_
             else
                 ptr = EMIT_SetFlagsConditional(ptr, cc, SR_Calt | SR_X, ARM_CC_CC);
         }
-        
+
         RA_FreeARMRegister(&ptr, tmp);
 
     }
@@ -1084,7 +1084,7 @@ static uint32_t *EMIT_MOVEfromSR(uint32_t *ptr, uint16_t opcode, uint16_t **m68k
 
     /* No supervisor. Update USP, generate exception */
     ptr = EMIT_Exception(ptr, VECTOR_PRIVILEGE_VIOLATION, 0);
-    
+
     *tmpptr = b_cc(A64_CC_AL, ptr - tmpptr);
     *ptr++ = (uint32_t)(uintptr_t)tmpptr;
     *ptr++ = 1;
@@ -1161,7 +1161,7 @@ static uint32_t *EMIT_MOVEtoSR(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_p
 
     *ptr++ = mov_reg(orig, cc);
     *ptr++ = mov_immed_u16(changed, 0xf71f, 0);
-    
+
     ptr = EMIT_LoadFromEffectiveAddress(ptr, 2, &src, opcode & 0x3f, *m68k_ptr, &ext_words, 1, NULL);
     if ((opcode & 0x38) == 0) /* Dn direct into SR */
     {
@@ -1229,7 +1229,7 @@ static uint32_t *EMIT_MOVEtoCCR(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_
     uint8_t cc = RA_ModifyCC(&ptr);
 
     ptr = EMIT_LoadFromEffectiveAddress(ptr, 2, &src, opcode & 0x3f, *m68k_ptr, &ext_words, 1, NULL);
-    
+
     if ((opcode & 0x38) == 0) /* Dn direct */
     {
         uint8_t src_mod = RA_AllocARMRegister(&ptr);
@@ -1243,7 +1243,7 @@ static uint32_t *EMIT_MOVEtoCCR(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_
     ptr = EMIT_AdvancePC(ptr, 2 * (ext_words + 1));
 
     RA_FreeARMRegister(&ptr, src);
-    
+
     (*m68k_ptr) += ext_words;
 
     return ptr;
@@ -1257,9 +1257,9 @@ static uint32_t *EMIT_EXT(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, u
     RA_SetDirtyM68kRegister(&ptr, opcode & 7);
     uint8_t mode = (opcode >> 6) & 7;
 
-    /* 
+    /*
         If current instruction is byte-to-word and subsequent is word-to-long on the same register,
-        then combine both to extb.l 
+        then combine both to extb.l
     */
 
     if ((mode == 2) && (opcode ^ cache_read_16(ICACHE, (uintptr_t)&(*m68k_ptr)[0])) == 0x40) {
@@ -1267,7 +1267,7 @@ static uint32_t *EMIT_EXT(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, u
         mode = 7;
         (*insn_consumed)++;
         ptr = EMIT_AdvancePC(ptr, 2);
-    } 
+    }
 
     /* Get update mask at this point first, otherwise the mask would suggest that flag change is not necessary */
     update_mask = M68K_GetSRMask(*m68k_ptr - 1);
@@ -1382,7 +1382,7 @@ static uint32_t *EMIT_LINK16(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr
             *ptr++ = movk_immed_u16(displ, 0xffff, 1);
         *ptr++ = add_reg(sp, sp, displ, LSL, 0);
     }
-    
+
 #else
     *ptr++ = add_reg(sp, sp, displ, 0);
 #endif
@@ -1747,7 +1747,7 @@ static uint32_t *EMIT_RTE(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, u
     /* Use two EORs to generate changed mask and update SR */
     *ptr++ = mov_reg(orig, cc);
     *ptr++ = eor_reg(changed, changed, cc, LSL, 0);
-    *ptr++ = eor_reg(cc, changed, cc, LSL, 0);       
+    *ptr++ = eor_reg(cc, changed, cc, LSL, 0);
 
     /* Now since stack is cleaned up, perform eventual stack switch */
     /* If neither S nor M changed, go further */
@@ -1857,7 +1857,7 @@ static uint32_t *EMIT_RTS(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, u
     uint16_t *ret_addr = M68K_PopReturnAddress(NULL);
     if (ret_addr != (uint16_t *)0xffffffff)
     {
-        /* 
+        /*
             If return stack is used, make sure that the code below is at the address we were expecting
             This must not be the case - it would be sufficient if code has modified the return address on the stack
         */
@@ -1899,7 +1899,7 @@ static uint32_t *EMIT_TRAPV(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr,
     *ptr++ = ands_immed(31, cc, 1, 32 - SRB_Valt);
     tmpptr = ptr;
     *ptr++ = b_cc(A64_CC_EQ, 0);
-    
+
     ptr = EMIT_Exception(ptr, VECTOR_TRAPcc, 2, (uint32_t)(uintptr_t)(*m68k_ptr - 1));
 
     *tmpptr = b_cc(A64_CC_EQ, ptr - tmpptr);
@@ -2469,7 +2469,7 @@ static uint32_t *EMIT_NBCD(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, 
     *ptr++ = sub_immed(result, result, 0x60);
 
     if (update_mask & SR_XC) {
-        
+
         cc = RA_ModifyCC(&ptr);
 
         switch (update_mask & SR_XC)
@@ -2710,7 +2710,7 @@ static uint32_t *EMIT_MOVEM(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr,
                     else {
                         if (block_size == 8 && (opcode & 0x38) == 0x18)
                             *ptr++ = ldp_postindex(base, rt1, reg, 8);
-                        else 
+                        else
                             *ptr++ = ldp(base, rt1, reg, offset);
                         offset += 8;
                         rt1 = 0xff;
@@ -2815,19 +2815,19 @@ static uint32_t *EMIT_CHK(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr, u
 
     /* Check if Dn < 0 */
     if (opcode & 0x80)
-        *ptr++ = adds_reg(31, 31, dn, LSL, 16); 
+        *ptr++ = adds_reg(31, 31, dn, LSL, 16);
     else
-        *ptr++ = adds_reg(31, 31, dn, LSL, 0); 
+        *ptr++ = adds_reg(31, 31, dn, LSL, 0);
 
     /* Jump to exception generator if negative */
     *ptr++ = b_cc(A64_CC_MI, 5);
-    
+
     /* Check if Dn > src */
     if (opcode & 0x80)
         *ptr++ = subs_reg(31, src, dn, LSL, 16);
     else
         *ptr++ = subs_reg(31, src, dn, LSL, 0);
-    
+
     uint32_t *tmp = ptr;
     *ptr++ = b_cc(A64_CC_GE, 0);
     *ptr++ = bic_immed(cc, cc, 1, 31 & (32 - SRB_N));
@@ -2902,7 +2902,7 @@ static struct OpcodeDef InsnTable[4096] = {
     [00020 ... 00047] = { { .od_EmitMulti = EMIT_NEGX }, NULL, SR_XZ, SR_CCR, 1, 0, 1 },
     [00120 ... 00147] = { { .od_EmitMulti = EMIT_NEGX }, NULL, SR_XZ, SR_CCR, 1, 0, 2 },
     [00220 ... 00247] = { { .od_EmitMulti = EMIT_NEGX }, NULL, SR_XZ, SR_CCR, 1, 0, 4 },
-    
+
     [00050 ... 00071] = { { .od_EmitMulti = EMIT_NEGX }, NULL, SR_XZ, SR_CCR, 1, 1, 1 },
     [00150 ... 00171] = { { .od_EmitMulti = EMIT_NEGX }, NULL, SR_XZ, SR_CCR, 1, 1, 2 },
     [00250 ... 00271] = { { .od_EmitMulti = EMIT_NEGX }, NULL, SR_XZ, SR_CCR, 1, 1, 4 },
@@ -2946,10 +2946,10 @@ static struct OpcodeDef InsnTable[4096] = {
     [05000 ... 05007] = { { .od_EmitMulti = EMIT_TST }, NULL, 0, SR_NZVC, 1, 0, 1 },
     [05020 ... 05047] = { { .od_EmitMulti = EMIT_TST }, NULL, 0, SR_NZVC, 1, 0, 1 },
     [05050 ... 05074] = { { .od_EmitMulti = EMIT_TST }, NULL, 0, SR_NZVC, 1, 1, 1 },
-    
+
     [05100 ... 05147] = { { .od_EmitMulti = EMIT_TST }, NULL, 0, SR_NZVC, 1, 0, 2 },
     [05150 ... 05174] = { { .od_EmitMulti = EMIT_TST }, NULL, 0, SR_NZVC, 1, 1, 2 },
-    
+
     [05200 ... 05247] = { { .od_EmitMulti = EMIT_TST }, NULL, 0, SR_NZVC, 1, 0, 4 },
     [05250 ... 05274] = { { .od_EmitMulti = EMIT_TST }, NULL, 0, SR_NZVC, 1, 1, 4 },
 
@@ -3100,7 +3100,7 @@ uint32_t GetSR_Line4(uint16_t opcode)
 int M68K_GetLine4Length(uint16_t *insn_stream)
 {
     uint16_t opcode = cache_read_16(ICACHE, (uintptr_t)&(*insn_stream));
-    
+
     int length = 0;
     int need_ea = 0;
     int opsize = 0;

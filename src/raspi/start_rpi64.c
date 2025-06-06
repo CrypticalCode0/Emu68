@@ -9,18 +9,18 @@
 
 #include <stdarg.h>
 #include <stdint.h>
-#include "A64.h"
-#include "config.h"
-#include "support.h"
-#include "tlsf.h"
-#include "mmu.h"
-#include "devicetree.h"
-#include "M68k.h"
-#include "HunkLoader.h"
-#include "DuffCopy.h"
-#include "EmuLogo.h"
-#include "EmuFeatures.h"
-#include "RegisterAllocator.h"
+#include "../../include/A64.h"
+#include "../../include/config.h"
+#include "../../include/support.h"
+#include "../../include/tlsf.h"
+#include "../../include/mmu.h"
+#include "../../include/devicetree.h"
+#include "../../include/M68k.h"
+#include "../../include/HunkLoader.h"
+#include "../../include/DuffCopy.h"
+#include "../../include/EmuLogo.h"
+#include "../../include/EmuFeatures.h"
+#include "../../include/RegisterAllocator.h"
 #include "version.h"
 
 void _start();
@@ -279,7 +279,7 @@ void platform_init()
 
             (void)addr_bus;
 
-            mmu_map(addr_cpu, start_map << 21, addr_len, 
+            mmu_map(addr_cpu, start_map << 21, addr_len,
                 MMU_ACCESS | MMU_ALLOW_EL0 | MMU_ATTR_DEVICE, 0);
 
             kprintf("bus: %08x, cpu: %08x, len: %08x\n", addr_bus, addr_cpu, addr_len);
@@ -310,7 +310,7 @@ void platform_post_init()
         kprintf("[BOOT] Changing ARM clock from %d MHz to %d MHz\n", get_clock_rate(3)/1000000, get_max_clock_rate(3)/1000000);
         set_clock_rate(3, get_max_clock_rate(3));
     }
-    kprintf("[BOOT] ARM Clock at %d MHz\n", get_clock_rate(3) / 1000000);  
+    kprintf("[BOOT] ARM Clock at %d MHz\n", get_clock_rate(3) / 1000000);
     kprintf("[BOOT] CORE Clock at %d MHz\n", get_clock_rate(4) / 1000000);
 
     get_vc_memory(&base_vcmem, &size_vcmem);

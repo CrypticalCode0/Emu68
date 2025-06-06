@@ -10,11 +10,11 @@
 
 #include <stdint.h>
 
-#include "config.h"
-#include "support.h"
-#include "tlsf.h"
+#include "../../include/config.h"
+#include "../../include/support.h"
+#include "../../include/tlsf.h"
 #include "ps_protocol.h"
-#include "M68k.h"
+#include "../../include/M68k.h"
 #include "cache.h"
 
 //volatile uint8_t gpio_lock;
@@ -167,7 +167,7 @@ typedef unsigned int uint;
 #define TXN_READ        (1 << TXN_RW_SHIFT)
 #define TXN_WRITE       (0 << TXN_RW_SHIFT)
 
-#define BCM2708_PERI_BASE 0xF2000000  
+#define BCM2708_PERI_BASE 0xF2000000
 #define BCM2708_PERI_SIZE 0x01000000
 
 #define GPIO_ADDR 0x200000
@@ -205,7 +205,7 @@ static inline void set_output() {
 void pistorm_setup_serial()
 {
     uint32_t fsel;
-    
+
     fsel = *(gpio + REG(SER_OUT_BIT));
     fsel &= LE32(~MASK(SER_OUT_BIT));
     fsel |= LE32(FUNC(SER_OUT_BIT, OUT));
@@ -309,7 +309,7 @@ void ps_clr_control(unsigned int value)
 unsigned int ps_read_status()
 {
 //    while(__atomic_test_and_set(&gpio_lock, __ATOMIC_ACQUIRE)) asm volatile("yield");
-    
+
     unsigned int status = read_ps_reg(REG_STATUS);
 
 //    __atomic_clear(&gpio_lock, __ATOMIC_RELEASE);
@@ -352,7 +352,7 @@ static void do_write_access_2s(unsigned int address, unsigned int data, unsigned
     write_ps_reg(REG_ADDR_HI, TXN_WRITE | (g_fc << TXN_FC_SHIFT) | (size << TXN_SIZE_SHIFT) | ((address >> 16) & 0xff));
 
     set_input();
-   
+
     /* For chip memory advance to next slot, for chipset access wait for completion of the transaction */
     if (address >= 0x00bf0000 && address <= 0x00dfffff)
     {
@@ -419,7 +419,7 @@ static inline void do_write_access_64_2s(unsigned int address, uint64_t data)
     write_ps_reg(REG_ADDR_HI, TXN_WRITE | (g_fc << TXN_FC_SHIFT) | (SIZE_LONG << TXN_SIZE_SHIFT) | ((address >> 16) & 0xff));
 
     set_input();
-   
+
     /* For chip memory advance to next slot, for chipset access wait for completion of the transaction */
     if (address >= 0x00bf0000 && address <= 0x00dfffff)
     {
@@ -772,7 +772,7 @@ static inline void do_write_access(unsigned int address, unsigned int data, unsi
     }
     else
         write_pending = 1;
-    
+
 //    __atomic_clear(&gpio_lock, __ATOMIC_RELEASE);
 }
 
@@ -809,7 +809,7 @@ static inline void do_write_access_64(unsigned int address, uint64_t data)
 
     /* Set address */
     write_ps_reg(REG_ADDR_LO, address & 0xffff);
-   
+
     /* Start second transaction */
     write_ps_reg(REG_ADDR_HI, TXN_WRITE | (g_fc << TXN_FC_SHIFT) | (SIZE_LONG << TXN_SIZE_SHIFT) | ((address >> 16) & 0xff));
 
@@ -824,7 +824,7 @@ static inline void do_write_access_64(unsigned int address, uint64_t data)
     }
     else
         write_pending = 1;
-    
+
 //    __atomic_clear(&gpio_lock, __ATOMIC_RELEASE);
 }
 
@@ -861,7 +861,7 @@ static inline void do_write_access_128(unsigned int address, uint128_t data)
 
     /* Set address */
     write_ps_reg(REG_ADDR_LO, address & 0xffff);
-    
+
     /* Start second transaction */
     write_ps_reg(REG_ADDR_HI, TXN_WRITE | (g_fc << TXN_FC_SHIFT) | (SIZE_LONG << TXN_SIZE_SHIFT) | ((address >> 16) & 0xff));
 
@@ -877,7 +877,7 @@ static inline void do_write_access_128(unsigned int address, uint128_t data)
 
     /* Set address */
     write_ps_reg(REG_ADDR_LO, address & 0xffff);
-    
+
     /* Start third transaction */
     write_ps_reg(REG_ADDR_HI, TXN_WRITE | (g_fc << TXN_FC_SHIFT) | (SIZE_LONG << TXN_SIZE_SHIFT) | ((address >> 16) & 0xff));
 
@@ -893,7 +893,7 @@ static inline void do_write_access_128(unsigned int address, uint128_t data)
 
     /* Set address */
     write_ps_reg(REG_ADDR_LO, address & 0xffff);
-    
+
     /* Start fourth transaction */
     write_ps_reg(REG_ADDR_HI, TXN_WRITE | (g_fc << TXN_FC_SHIFT) | (SIZE_LONG << TXN_SIZE_SHIFT) | ((address >> 16) & 0xff));
 
@@ -1001,7 +1001,7 @@ static inline uint128_t do_read_access_128(unsigned int address)
     set_output();
 
     write_ps_reg(REG_ADDR_LO, address & 0xffff);
-    
+
     if (write_pending) while ((rdval = *gpread) & LE32(1 << PIN_TXN)) {}
 //    gpio_rdval = LE32(rdval);
 
@@ -1076,7 +1076,7 @@ void ps_setup_protocol()
     if (use_2slot)
     {
         kprintf("[PS32] Setting up two-slot protocol\n");
-        
+
         read_access = do_read_access_2s;
         read_access_64 = do_read_access_64_2s;
         read_access_128 = do_read_access_128_2s;
@@ -1354,11 +1354,11 @@ void bitbang_putByte(uint8_t byte)
     asm volatile("mrs %0, CNTPCT_EL0":"=r"(t0));
 
     *(gpio + 10) = LE32(1 << SER_OUT_BIT); // Start bit - 0
-  
+
     do {
         asm volatile("mrs %0, CNTPCT_EL0":"=r"(t1));
     } while(t1 < (t0 + BITBANG_DELAY));
-  
+
     for (int i=0; i < 8; i++) {
         asm volatile("mrs %0, CNTPCT_EL0":"=r"(t0));
 
@@ -1387,13 +1387,13 @@ void fastSerial_putByte_pi3(uint8_t byte)
 {
     if (!gpio)
         gpio = ((volatile unsigned *)BCM2708_PERI_BASE) + GPIO_ADDR / 4;
-  
+
     /* Start bit */
     *(gpio + 10) = LE32(1 << SER_OUT_BIT);
 
     /* Clock down */
     *(gpio + 10) = LE32(1 << SER_OUT_CLK);
-    
+
     /* Clock up */
     *(gpio + 7) = LE32(1 << SER_OUT_CLK);
 
@@ -1405,10 +1405,10 @@ void fastSerial_putByte_pi3(uint8_t byte)
 
         /* Clock down */
         *(gpio + 10) = LE32(1 << SER_OUT_CLK);
-        
+
         /* Clock up */
         *(gpio + 7) = LE32(1 << SER_OUT_CLK);
-        
+
         byte = byte >> 1;
     }
 
@@ -1431,7 +1431,7 @@ void fastSerial_putByte_pi4(uint8_t byte)
 {
     if (!gpio)
         gpio = ((volatile unsigned *)BCM2708_PERI_BASE) + GPIO_ADDR / 4;
-  
+
     /* Start bit */
     *(gpio + 10) = LE32(1 << SER_OUT_BIT);
 
@@ -1458,7 +1458,7 @@ void fastSerial_putByte_pi4(uint8_t byte)
         *(gpio + 7) = LE32(1 << SER_OUT_CLK);
         *(gpio + 7) = LE32(1 << SER_OUT_CLK);
         *(gpio + 7) = LE32(1 << SER_OUT_CLK);
-        
+
         byte = byte >> 1;
     }
 
@@ -1512,10 +1512,10 @@ void fastSerial_putByte(uint8_t byte)
 
     if (!gpio)
         gpio = ((volatile unsigned *)BCM2708_PERI_BASE) + GPIO_ADDR / 4;
-  
+
     if (fs_putByte)
         fs_putByte(byte);
-    
+
     if (byte == 10)
         reset_pending = 1;
 }
@@ -1538,7 +1538,7 @@ void fastSerial_init()
     else
     {
         fs_putByte = fastSerial_putByte_pi3;
-    }   
+    }
 
     fastSerial_reset();
 }
@@ -1551,11 +1551,11 @@ void fastSerial_init()
 
 volatile int housekeeper_enabled = 0;
 
-void ps_housekeeper() 
+void ps_housekeeper()
 {
     if (!gpio)
         gpio = ((volatile unsigned *)BCM2708_PERI_BASE) + GPIO_ADDR / 4;
-  
+
     extern uint64_t arm_cnt;
     uint64_t t0;
     uint64_t last_arm_cnt = arm_cnt;
@@ -1582,7 +1582,7 @@ void ps_housekeeper()
     }
 
     uint8_t pin_prev = LE32(*gpread);
-    
+
     for(;;) {
         if (housekeeper_enabled)
         {
@@ -1732,14 +1732,14 @@ void ps_buptest(unsigned int test_size, unsigned int maxiter)
             if ((i % (frac * 4)) == 1)
                 kprintf_pc(__putc, NULL, "*");
         }
-        
+
         for (uint32_t i = 0; i < (test_size) - 4; i += 2) {
             uint32_t c = BE32(ps_read_32(i));
             if (c != *((uint32_t *)&garbage[i])) {
                 kprintf_pc(__putc, NULL, "\n    READ32_EVEN: Garbege data mismatch at $%.6X: %.8X should be %.8X.\n", i, c, *((uint32_t *)&garbage[i]));
                 while(1);
             }
-            
+
             if ((i % (frac * 4)) == 0)
                 kprintf_pc(__putc, NULL, "*");
         }

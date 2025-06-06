@@ -1,4 +1,4 @@
-#include <support.h>
+#include <../include/support.h>
 
 const char * find_token(const char * string, const char * token)
 {

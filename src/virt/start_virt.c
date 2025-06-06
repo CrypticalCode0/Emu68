@@ -9,18 +9,18 @@
 
 #include <stdarg.h>
 #include <stdint.h>
-#include "A64.h"
-#include "config.h"
-#include "support.h"
-#include "tlsf.h"
-#include "mmu.h"
-#include "devicetree.h"
-#include "M68k.h"
-#include "HunkLoader.h"
-#include "DuffCopy.h"
-#include "EmuLogo.h"
-#include "EmuFeatures.h"
-#include "RegisterAllocator.h"
+#include "../../include/A64.h"
+#include "../../include/config.h"
+#include "../../include/support.h"
+#include "../../include/tlsf.h"
+#include "../../include/mmu.h"
+#include "../../include/devicetree.h"
+#include "../../include/M68k.h"
+#include "../../include/HunkLoader.h"
+#include "../../include/DuffCopy.h"
+#include "../../include/EmuLogo.h"
+#include "../../include/EmuFeatures.h"
+#include "../../include/RegisterAllocator.h"
 
 extern uint64_t mmu_user_L1[512];
 extern uint64_t mmu_user_L2[4*512];
@@ -33,7 +33,7 @@ void platform_init()
         accessed from m68k.
     */
 
-    mmu_map(0x09000000, 0x09000000, 0x00001000, 
+    mmu_map(0x09000000, 0x09000000, 0x00001000,
         MMU_ACCESS | MMU_NS | MMU_ALLOW_EL0 | MMU_ATTR_DEVICE, 0);
     mmu_map(0x09000000, 0xf2201000, 0x00001000,
         MMU_ACCESS | MMU_NS | MMU_ALLOW_EL0 | MMU_ATTR_DEVICE, 0);

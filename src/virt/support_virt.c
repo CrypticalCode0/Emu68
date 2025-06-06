@@ -10,7 +10,7 @@
 #include <stdint.h>
 #include <stdarg.h>
 
-#include "support.h"
+#include "../../include/support.h"
 
 static int serial_up = 0;
 
@@ -89,7 +89,7 @@ void setup_serial()
                 ULONG *ranges = dt_find_property(serial->on_parent, "ranges")->op_value;
                 phys_base -= ranges[0];
                 phys_base += ranges[1];
-                
+
                 pl011_base = (void *)phys_base;
             }
         }

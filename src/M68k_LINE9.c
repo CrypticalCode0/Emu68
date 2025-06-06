@@ -7,10 +7,10 @@
     with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-#include "support.h"
-#include "M68k.h"
-#include "RegisterAllocator.h"
-#include "cache.h"
+#include "../include/support.h"
+#include "../include/M68k.h"
+#include "../include/RegisterAllocator.h"
+#include "../include/cache.h"
 
 /* Line9 is one large SUBX/SUB/SUBA */
 
@@ -119,7 +119,7 @@ uint32_t *EMIT_SUB_reg(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                     *ptr++ = ands_immed(31, dest, 8, 0);
                     break;
             }
-            
+
             ptr = EMIT_SetFlagsConditional(ptr, cc, SR_Z, A64_CC_EQ);
             update_mask = 0;
         }
@@ -137,7 +137,7 @@ uint32_t *EMIT_SUB_reg(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                     *ptr++ = ands_immed(31, dest, 1, 32-7);
                     break;
             }
-            
+
             ptr = EMIT_SetFlagsConditional(ptr, cc, SR_N, A64_CC_NE);
             update_mask = 0;
         }
@@ -263,7 +263,7 @@ uint32_t *EMIT_SUB_reg(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                     *ptr++ = ands_immed(31, tmp, 8, 0);
                     break;
             }
-            
+
             ptr = EMIT_SetFlagsConditional(ptr, cc, SR_Z, A64_CC_EQ);
             update_mask = 0;
         }
@@ -281,7 +281,7 @@ uint32_t *EMIT_SUB_reg(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                     *ptr++ = ands_immed(31, tmp, 1, 32-7);
                     break;
             }
-            
+
             ptr = EMIT_SetFlagsConditional(ptr, cc, SR_N, A64_CC_NE);
             update_mask = 0;
         }
@@ -375,7 +375,7 @@ uint32_t *EMIT_SUBA_reg(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
         if (immed)
         {
             offset = ((int16_t)cache_read_16(ICACHE, (uintptr_t)&(*m68k_ptr)[0]) << 16) | (uint16_t)cache_read_16(ICACHE, (uintptr_t)&(*m68k_ptr)[1]);
-            
+
             if (offset >= 0 && offset < 4096)
             {
                 *ptr++ = sub_immed(reg, reg, offset);
@@ -395,7 +395,7 @@ uint32_t *EMIT_SUBA_reg(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
         if (immed == 0)
             ptr = EMIT_LoadFromEffectiveAddress(ptr, size, &tmp, opcode & 0x3f, *m68k_ptr, &ext_words, 1, NULL);
     }
-        
+
 
     if (immed == 0)
         *ptr++ = sub_reg(reg, reg, tmp, LSL, 0);
@@ -712,7 +712,7 @@ uint32_t *EMIT_SUBX_reg(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
 #endif
             update_mask &= ~SR_Z;
         }
-        
+
         uint8_t alt_flags = update_mask;
         if ((alt_flags & 3) != 0 && (alt_flags & 3) < 3)
             alt_flags ^= 3;
@@ -764,7 +764,7 @@ static struct OpcodeDef InsnTable[512] = {
 	[0550 ... 0571] = { { EMIT_SUB_ext }, NULL, 0, SR_CCR, 1, 1, 2 },
 	[0620 ... 0647] = { { EMIT_SUB_mem }, NULL, 0, SR_CCR, 1, 0, 4 },
 	[0650 ... 0671] = { { EMIT_SUB_ext }, NULL, 0, SR_CCR, 1, 1, 4 },
-	
+
 	[0700 ... 0717] = { { EMIT_SUBA_reg }, NULL, 0, 0, 1, 0, 4 },
 	[0720 ... 0747] = { { EMIT_SUBA_mem }, NULL, 0, 0, 1, 0, 4 },
 	[0750 ... 0774] = { { EMIT_SUBA_ext }, NULL, 0, 0, 1, 1, 4 }, //Long
@@ -811,7 +811,7 @@ uint32_t GetSR_Line9(uint16_t opcode)
 int M68K_GetLine9Length(uint16_t *insn_stream)
 {
     uint16_t opcode = cache_read_16(ICACHE, (uintptr_t)insn_stream);
-    
+
     int length = 0;
     int need_ea = 0;
     int opsize = 0;

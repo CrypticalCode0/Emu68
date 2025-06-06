@@ -7,9 +7,9 @@
     with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-#include "RegisterAllocator.h"
-#include "ARM.h"
-#include "M68k.h"
+#include "../../include/RegisterAllocator.h"
+#include "../../include/ARM.h"
+#include "../../include/M68k.h"
 
 static struct {
     uint8_t rs_ARMReg;

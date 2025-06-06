@@ -10,11 +10,11 @@
 
 #include <stdint.h>
 
-#include "config.h"
-#include "support.h"
-#include "tlsf.h"
+#include "../../include/config.h"
+#include "../../include/support.h"
+#include "../../include/tlsf.h"
 #include "ps_protocol.h"
-#include "M68k.h"
+#include "../../include/M68k.h"
 #include "cache.h"
 
 volatile unsigned int *gpio;
@@ -87,7 +87,7 @@ static inline void ticksleep_wfe(uint64_t ticks)
 #define TXD_BIT (1 << 26)
 
 uint32_t bitbang_delay;
- 
+
 void bitbang_putByte(uint8_t byte)
 {
     if (!gpio)
@@ -97,11 +97,11 @@ void bitbang_putByte(uint8_t byte)
     asm volatile("mrs %0, CNTPCT_EL0":"=r"(t0));
 
     *(gpio + 10) = LE32(TXD_BIT); // Start bit - 0
-  
+
     do {
         asm volatile("mrs %0, CNTPCT_EL0":"=r"(t1));
     } while(t1 < (t0 + bitbang_delay));
-  
+
     for (int i=0; i < 8; i++) {
         asm volatile("mrs %0, CNTPCT_EL0":"=r"(t0));
 
@@ -134,7 +134,7 @@ void fastSerial_putByte_pi3(uint8_t byte)
 {
     if (!gpio)
         gpio = ((volatile unsigned *)BCM2708_PERI_BASE) + GPIO_ADDR / 4;
-  
+
     /* Wait for CTS to go high */
     //while (0 == (*(gpio + 13) & LE32(FS_CTS))) {}
 
@@ -160,7 +160,7 @@ void fastSerial_putByte_pi3(uint8_t byte)
         /* Clock up */
         *(gpio + 7) = LE32(FS_CLK);
         //*(gpio + 7) = LE32(FS_CLK);
-        
+
         byte = byte >> 1;
     }
 
@@ -183,7 +183,7 @@ void fastSerial_putByte_pi4(uint8_t byte)
 {
     if (!gpio)
         gpio = ((volatile unsigned *)BCM2708_PERI_BASE) + GPIO_ADDR / 4;
-  
+
     /* Start bit */
     *(gpio + 10) = LE32(FS_DO);
 
@@ -206,7 +206,7 @@ void fastSerial_putByte_pi4(uint8_t byte)
         /* Clock up */
         *(gpio + 7) = LE32(FS_CLK);
         *(gpio + 7) = LE32(FS_CLK);
-        
+
         byte = byte >> 1;
     }
 
@@ -256,10 +256,10 @@ void fastSerial_putByte(uint8_t byte)
 
     if (!gpio)
         gpio = ((volatile unsigned *)BCM2708_PERI_BASE) + GPIO_ADDR / 4;
-  
+
     if (fs_putByte)
         fs_putByte(byte);
-    
+
     if (byte == 10)
         reset_pending = 1;
 }
@@ -270,7 +270,7 @@ void fastSerial_init()
 
     if (!gpio)
         gpio = ((volatile unsigned *)BCM2708_PERI_BASE) + GPIO_ADDR / 4;
-  
+
     asm volatile("mrs %0, CNTFRQ_EL0":"=r"(tmp));
 
     if (tmp > 20000000)
@@ -280,7 +280,7 @@ void fastSerial_init()
     else
     {
         fs_putByte = fastSerial_putByte_pi3;
-    }   
+    }
 
     fastSerial_reset();
 }
@@ -764,7 +764,7 @@ void ps_pulse_reset()
     ps_write_status_reg(0);
     usleep(30000);
     ps_write_status_reg(STATUS_BIT_RESET);
-    
+
     overlay = 1;
     board = &__boards_start;
     board_idx = 0;
@@ -787,11 +787,11 @@ unsigned int ps_get_ipl_zero()
 volatile int housekeeper_enabled = 0;
 extern struct M68KState *__m68k_state;
 
-void ps_housekeeper() 
+void ps_housekeeper()
 {
     if (!gpio)
         gpio = ((volatile unsigned *)BCM2708_PERI_BASE) + GPIO_ADDR / 4;
-  
+
     extern uint64_t arm_cnt;
     uint64_t t0;
     uint64_t last_arm_cnt = arm_cnt;
@@ -869,7 +869,7 @@ void wb_push(uint32_t address, uint32_t value, uint8_t size)
 {
     while(wr_tail + WRITEBUFFER_SIZE <= wr_head)
         asm volatile("yield");
-    
+
     wr_buffer[wr_head & (WRITEBUFFER_SIZE - 1)].wr_addr = address;
     wr_buffer[wr_head & (WRITEBUFFER_SIZE - 1)].wr_value = value;
     wr_buffer[wr_head & (WRITEBUFFER_SIZE - 1)].wr_size = size;
@@ -877,7 +877,7 @@ void wb_push(uint32_t address, uint32_t value, uint8_t size)
     asm volatile("dmb sy":::"memory");
 
     __sync_add_and_fetch(&wr_head, 1);
-    
+
     asm volatile("sev");
 }
 
@@ -890,7 +890,7 @@ struct WriteRequest wb_pop()
     struct WriteRequest data = wr_buffer[wr_tail & (WRITEBUFFER_SIZE - 1)];
 
     __sync_add_and_fetch(&wr_tail, 1);
-    
+
     return data;
 }
 
@@ -1105,7 +1105,7 @@ unsigned int ps_read_8(unsigned int address)
         ticksleep(CHIPSET_DELAY);
     }
 #endif
-    return val;  
+    return val;
 }
 
 unsigned int ps_read_16(unsigned int address)
@@ -1251,14 +1251,14 @@ void ps_buptest(unsigned int test_size, unsigned int maxiter)
             if ((i % (frac * 4)) == 1)
                 kprintf_pc(__putc, NULL, "*");
         }
-        
+
         for (uint32_t i = 0; i < (test_size) - 4; i += 2) {
             uint32_t c = BE32(ps_read_32(i));
             if (c != *((uint32_t *)&garbage[i])) {
                 kprintf_pc(__putc, NULL, "\n    READ32_EVEN: Garbege data mismatch at $%.6X: %.8X should be %.8X.\n", i, c, *((uint32_t *)&garbage[i]));
                 while(1);
             }
-            
+
             if ((i % (frac * 4)) == 0)
                 kprintf_pc(__putc, NULL, "*");
         }

@@ -9,9 +9,9 @@
     with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-#include "support.h"
-#include "M68k.h"
-#include "RegisterAllocator.h"
+#include "../include/support.h"
+#include "../include/M68k.h"
+#include "../include/RegisterAllocator.h"
 
 uint32_t *EMIT_Exception(uint32_t *ptr, uint16_t exception, uint8_t format, ...)
 {
@@ -21,7 +21,7 @@ uint32_t *EMIT_Exception(uint32_t *ptr, uint16_t exception, uint8_t format, ...)
     uint8_t vbr = RA_AllocARMRegister(&ptr);
     uint8_t cc = RA_ModifyCC(&ptr);
     int need_free_ctx = 0;
-    
+
     if (ctx == 0xff) {
         need_free_ctx = 1;
         ctx = RA_GetCTX(&ptr);
@@ -115,7 +115,7 @@ uint32_t *EMIT_Exception(uint32_t *ptr, uint16_t exception, uint8_t format, ...)
     *ptr++ = ldr_offset(vbr, REG_PC, exception);
 
     RA_FreeARMRegister(&ptr, vbr);
-    
+
     if (need_free_ctx) {
         RA_FlushCTX(&ptr);
     }

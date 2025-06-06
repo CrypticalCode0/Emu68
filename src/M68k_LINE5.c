@@ -7,15 +7,15 @@
     with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-#include "support.h"
-#include "M68k.h"
-#include "RegisterAllocator.h"
-#include "cache.h"
+#include "../include/support.h"
+#include "../include/M68k.h"
+#include "../include/RegisterAllocator.h"
+#include "../include/cache.h"
 
 uint32_t *EMIT_ADDQ(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
 {
     uint8_t update_mask = M68K_GetSRMask(*m68k_ptr - 1);
-    
+
     /* ADDQ */
     uint8_t update_cc = 1;
     uint8_t ext_count = 0;
@@ -50,7 +50,7 @@ uint32_t *EMIT_ADDQ(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                         *ptr++ = ands_immed(31, tmp, 1, 32-7);
                     }
                 }
-                else 
+                else
                 {
                     *ptr++ = mov_immed_u16(tmp, data << 8, 1);
                     *ptr++ = adds_reg(tmp, tmp, dest, LSL, 24);
@@ -79,7 +79,7 @@ uint32_t *EMIT_ADDQ(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                         *ptr++ = ands_immed(31, tmp, 1, 32-15);
                     }
                 }
-                else 
+                else
                 {
                     *ptr++ = mov_immed_u16(tmp, data, 1);
                     *ptr++ = adds_reg(tmp, tmp, dest, LSL, 16);
@@ -136,7 +136,7 @@ uint32_t *EMIT_ADDQ(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
 #ifdef __aarch64__
                 if (update_mask == 0 || update_mask == SR_Z || update_mask == SR_N) {
                     *ptr++ = add_immed(tmp, tmp, data);
-                    
+
                     if (update_mask == SR_Z) {
                         *ptr++ = ands_immed(31, tmp, 8, 0);
                     }
@@ -144,7 +144,7 @@ uint32_t *EMIT_ADDQ(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                         *ptr++ = ands_immed(31, tmp, 1, 32-7);
                     }
                 }
-                else 
+                else
                 {
                     uint8_t immed = RA_AllocARMRegister(&ptr);
                     *ptr++ = mov_immed_u16(immed, data << 8, 1);
@@ -187,7 +187,7 @@ uint32_t *EMIT_ADDQ(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                         *ptr++ = ands_immed(31, tmp, 1, 32-15);
                     }
                 }
-                else 
+                else
                 {
                     uint8_t immed = RA_AllocARMRegister(&ptr);
                     *ptr++ = mov_immed_u16(immed, data, 1);
@@ -239,17 +239,17 @@ uint32_t *EMIT_ADDQ(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
 
     if (((opcode >> 6) & 3) < 2)
     {
-        if (update_mask == SR_Z) 
+        if (update_mask == SR_Z)
         {
             uint8_t cc = RA_ModifyCC(&ptr);
-            ptr = EMIT_ClearFlags(ptr, cc, SR_Z);          
+            ptr = EMIT_ClearFlags(ptr, cc, SR_Z);
             ptr = EMIT_SetFlagsConditional(ptr, cc, SR_Z, A64_CC_EQ);
             update_mask = 0;
         }
-        else if (update_mask == SR_N) 
+        else if (update_mask == SR_N)
         {
             uint8_t cc = RA_ModifyCC(&ptr);
-            ptr = EMIT_ClearFlags(ptr, cc, SR_N);          
+            ptr = EMIT_ClearFlags(ptr, cc, SR_N);
             ptr = EMIT_SetFlagsConditional(ptr, cc, SR_N, A64_CC_NE);
             update_mask = 0;
         }
@@ -524,17 +524,17 @@ uint32_t *EMIT_SUBQ(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
 
     if (((opcode >> 6) & 3) < 2)
     {
-        if (update_mask == SR_Z) 
+        if (update_mask == SR_Z)
         {
             uint8_t cc = RA_ModifyCC(&ptr);
-            ptr = EMIT_ClearFlags(ptr, cc, SR_Z);          
+            ptr = EMIT_ClearFlags(ptr, cc, SR_Z);
             ptr = EMIT_SetFlagsConditional(ptr, cc, SR_Z, A64_CC_EQ);
             update_mask = 0;
         }
-        else if (update_mask == SR_N) 
+        else if (update_mask == SR_N)
         {
             uint8_t cc = RA_ModifyCC(&ptr);
-            ptr = EMIT_ClearFlags(ptr, cc, SR_N);          
+            ptr = EMIT_ClearFlags(ptr, cc, SR_N);
             ptr = EMIT_SetFlagsConditional(ptr, cc, SR_N, A64_CC_NE);
             update_mask = 0;
         }
@@ -737,7 +737,7 @@ uint32_t *EMIT_TRAPcc(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
         *ptr++ = 0;
         *ptr++ = INSN_TO_LE(0xfffffffe);
     }
-    
+
     return ptr;
 }
 
@@ -872,7 +872,7 @@ uint32_t *EMIT_DBcc(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
         RA_FreeARMRegister(&ptr, reg);
 
         *branch_2 = b_cc(A64_CC_PL, ptr - branch_2);
-        
+
         *m68k_ptr = (void *)((uintptr_t)bra_rel_ptr + branch_offset);
 
         *ptr++ = (uint32_t)(uintptr_t)branch_2;
@@ -892,7 +892,7 @@ uint32_t *EMIT_DBcc(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
 static struct OpcodeDef InsnTable[512] = {
 	[0000 ... 0007] = { { .od_Emit = EMIT_ADDQ }, NULL, 0, SR_CCR, 1, 0, 1 },
 	[0020 ... 0047] = { { .od_Emit = EMIT_ADDQ }, NULL, 0, SR_CCR, 1, 0, 1 },
-	[0050 ... 0071] = { { .od_Emit = EMIT_ADDQ }, NULL, 0, SR_CCR, 1, 1, 1 }, 
+	[0050 ... 0071] = { { .od_Emit = EMIT_ADDQ }, NULL, 0, SR_CCR, 1, 1, 1 },
 	[0100 ... 0107] = { { .od_Emit = EMIT_ADDQ }, NULL, 0, SR_CCR, 1, 0, 2 },
     [0110 ... 0117] = { { .od_Emit = EMIT_ADDQ }, NULL, 0, 0, 1, 0, 2 },
     [0120 ... 0147] = { { .od_Emit = EMIT_ADDQ }, NULL, 0, SR_CCR, 1, 0, 2 },
@@ -973,7 +973,7 @@ uint32_t GetSR_Line5(uint16_t opcode)
 int M68K_GetLine5Length(uint16_t *insn_stream)
 {
     uint16_t opcode = cache_read_16(ICACHE, (uintptr_t)&(*insn_stream));
-    
+
     int length = 0;
     int need_ea = 0;
     int opsize = 0;

@@ -7,10 +7,10 @@
     with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-#include "support.h"
-#include "M68k.h"
-#include "RegisterAllocator.h"
-#include "cache.h"
+#include "../include/support.h"
+#include "../include/M68k.h"
+#include "../include/RegisterAllocator.h"
+#include "../include/cache.h"
 
 /* Line9 is one large ADDX/ADD/ADDA */
 
@@ -102,7 +102,7 @@ static uint32_t *EMIT_ADD_ext(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_pt
                     *ptr++ = ands_immed(31, dest, 8, 0);
                     break;
             }
-            
+
             ptr = EMIT_SetFlagsConditional(ptr, cc, SR_Z, A64_CC_EQ);
             update_mask = 0;
         }
@@ -120,7 +120,7 @@ static uint32_t *EMIT_ADD_ext(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_pt
                     *ptr++ = ands_immed(31, dest, 1, 32-7);
                     break;
             }
-            
+
             ptr = EMIT_SetFlagsConditional(ptr, cc, SR_N, A64_CC_NE);
             update_mask = 0;
         }
@@ -179,7 +179,7 @@ static uint32_t *EMIT_ADD_ext(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_pt
             if (update_mask == 0 || update_mask == SR_Z || update_mask == SR_N) {
                 *ptr++ = add_reg(tmp, tmp, src, LSL, 0);
             }
-            else 
+            else
             {
                 *ptr++ = lsl(tmp, tmp, 16);
                 *ptr++ = adds_reg(tmp, tmp, src, LSL, 16);
@@ -213,7 +213,7 @@ static uint32_t *EMIT_ADD_ext(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_pt
             if (update_mask == 0 || update_mask == SR_Z || update_mask == SR_N) {
                 *ptr++ = add_reg(tmp, tmp, src, LSL, 0);
             }
-            else 
+            else
             {
                 *ptr++ = lsl(tmp, tmp, 24);
                 *ptr++ = adds_reg(tmp, tmp, src, LSL, 24);
@@ -248,7 +248,7 @@ static uint32_t *EMIT_ADD_ext(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_pt
                     *ptr++ = ands_immed(31, tmp, 8, 0);
                     break;
             }
-            
+
             ptr = EMIT_SetFlagsConditional(ptr, cc, SR_Z, A64_CC_EQ);
             update_mask = 0;
         }
@@ -266,7 +266,7 @@ static uint32_t *EMIT_ADD_ext(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_pt
                     *ptr++ = ands_immed(31, tmp, 1, 32-7);
                     break;
             }
-            
+
             ptr = EMIT_SetFlagsConditional(ptr, cc, SR_N, A64_CC_NE);
             update_mask = 0;
         }
@@ -339,14 +339,14 @@ static uint32_t *EMIT_ADDA_ext(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_p
 
         if (immed == 0)
             ptr = EMIT_LoadFromEffectiveAddress(ptr, 0x80 | size, &tmp, opcode & 0x3f, *m68k_ptr, &ext_words, 0, NULL);
-    }    
+    }
     else
     {
         int32_t offset;
         if (immed)
         {
             offset = ((int16_t)cache_read_16(ICACHE, (uintptr_t)&(*m68k_ptr)[0]) << 16) | (uint16_t)cache_read_16(ICACHE, (uintptr_t)&(*m68k_ptr)[1]);
-            
+
             if (offset >= 0 && offset < 4096)
             {
                 *ptr++ = add_immed(reg, reg, offset);
@@ -366,7 +366,7 @@ static uint32_t *EMIT_ADDA_ext(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_p
         if (immed == 0)
             ptr = EMIT_LoadFromEffectiveAddress(ptr, size, &tmp, opcode & 0x3f, *m68k_ptr, &ext_words, 1, NULL);
     }
-    
+
     if (tmp != 0xff)
         *ptr++ = add_reg(reg, reg, tmp, LSL, 0);
 
@@ -697,7 +697,7 @@ static struct OpcodeDef InsnTable[4096] = {
     [0320 ... 0347] = { { EMIT_ADDA_mem }, NULL, 0, 0, 1, 0, 2 },
     [0350 ... 0374] = { { EMIT_ADDA_ext }, NULL, 0, 0, 1, 1, 2 },
     [0400 ... 0407] = { { EMIT_ADDX_reg }, NULL, SR_XZ, SR_CCR, 1, 0, 1 },   //Byte
-    [0410 ... 0417] = { { EMIT_ADDX_mem }, NULL, SR_XZ, SR_CCR, 1, 0, 1 }, 
+    [0410 ... 0417] = { { EMIT_ADDX_mem }, NULL, SR_XZ, SR_CCR, 1, 0, 1 },
     [0500 ... 0507] = { { EMIT_ADDX_reg }, NULL, SR_XZ, SR_CCR, 1, 0, 2 },   //Word
     [0510 ... 0517] = { { EMIT_ADDX_mem }, NULL, SR_XZ, SR_CCR, 1, 0, 2 },
     [0600 ... 0607] = { { EMIT_ADDX_reg }, NULL, SR_XZ, SR_CCR, 1, 0, 4 },   //Long
@@ -757,7 +757,7 @@ uint32_t GetSR_LineD(uint16_t opcode)
 int M68K_GetLineDLength(uint16_t *insn_stream)
 {
     uint16_t opcode = cache_read_16(ICACHE, (uintptr_t)insn_stream);
-    
+
     int length = 0;
     int need_ea = 0;
     int opsize = 0;

@@ -9,15 +9,15 @@
 
 #include <stdarg.h>
 #include <stdint.h>
-#include "config.h"
-#include "support.h"
-#include "tlsf.h"
-#include "devicetree.h"
-#include "M68k.h"
-#include "HunkLoader.h"
-#include "DuffCopy.h"
-#include "EmuLogo.h"
-#include "EmuFeatures.h"
+#include "../../include/config.h"
+#include "../../include/support.h"
+#include "../../include/tlsf.h"
+#include "../../include/devicetree.h"
+#include "../../include/M68k.h"
+#include "../../include/HunkLoader.h"
+#include "../../include/DuffCopy.h"
+#include "../../include/EmuLogo.h"
+#include "../../include/EmuFeatures.h"
 
 void _start();
 

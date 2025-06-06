@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 /*
-    Code reorganized and rewritten by 
+    Code reorganized and rewritten by
     Niklas Ekström 2021 (https://github.com/niklasekstrom)
 */
 
@@ -9,7 +9,7 @@
 #define _PS_PROTOCOL_H
 
 #include <stdint.h>
-#include "support.h"
+#include "../../include/support.h"
 
 #ifdef PS_PROTOCOL_IMPL
 
@@ -35,7 +35,7 @@
 #define STATUS_SHIFT_IPL 13
 
 // PERIIOBASE set equally for all RasPi targets, mapped there by Emu68
-#define BCM2708_PERI_BASE 0xF2000000  
+#define BCM2708_PERI_BASE 0xF2000000
 #define BCM2708_PERI_SIZE 0x01000000
 
 #define GPIO_ADDR 0x200000 /* GPIO controller */

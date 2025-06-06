@@ -9,18 +9,18 @@
 
 #include <stdarg.h>
 #include <stdint.h>
-#include "A64.h"
-#include "config.h"
-#include "support.h"
-#include "tlsf.h"
-#include "mmu.h"
-#include "devicetree.h"
-#include "M68k.h"
-#include "HunkLoader.h"
-#include "DuffCopy.h"
-#include "EmuLogo.h"
-#include "EmuFeatures.h"
-#include "RegisterAllocator.h"
+#include "../../include/A64.h"
+#include "../../include/config.h"
+#include "../../include/support.h"
+#include "../../include/tlsf.h"
+#include "../../include/mmu.h"
+#include "../../include/devicetree.h"
+#include "../../include/M68k.h"
+#include "../../include/HunkLoader.h"
+#include "../../include/DuffCopy.h"
+#include "../../include/EmuLogo.h"
+#include "../../include/EmuFeatures.h"
+#include "../../include/RegisterAllocator.h"
 
 extern uint64_t mmu_user_L1[512];
 extern uint64_t mmu_user_L2[4*512];
@@ -32,7 +32,7 @@ void platform_init()
         All peripherals are mapped in the lower 4G address space so that they can be
         accessed from m68k.
     */
-    mmu_map(0xf8000000, 0xf8000000, 0x08000000, 
+    mmu_map(0xf8000000, 0xf8000000, 0x08000000,
         MMU_ACCESS | MMU_NS | MMU_ALLOW_EL0 | MMU_ATTR_DEVICE, 0);
 }
 

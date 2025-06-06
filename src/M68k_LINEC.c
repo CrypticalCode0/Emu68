@@ -7,10 +7,10 @@
     with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-#include "support.h"
-#include "M68k.h"
-#include "RegisterAllocator.h"
-#include "cache.h"
+#include "../include/support.h"
+#include "../include/M68k.h"
+#include "../include/RegisterAllocator.h"
+#include "../include/cache.h"
 
 uint32_t *EMIT_MULU(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr);
 uint32_t *EMIT_MULS(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr);
@@ -37,7 +37,7 @@ static uint32_t *EMIT_AND_ext(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_pt
         test_register = dest;
 
         RA_SetDirtyM68kRegister(&ptr, (opcode >> 9) & 7);
-        
+
         if (size == 4)
             ptr = EMIT_LoadFromEffectiveAddress(ptr, size, &src, opcode & 0x3f, *m68k_ptr, &ext_words, 1, NULL);
         else
@@ -235,7 +235,7 @@ static uint32_t *EMIT_ABCD_reg(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_p
 
     RA_SetDirtyM68kRegister(&ptr, (opcode >> 9) & 7);
 
-    // Mask higher and lower nibbles, perform calculation. 
+    // Mask higher and lower nibbles, perform calculation.
     *ptr++ = and_immed(tmp_a, src, 4, 0);
     *ptr++ = and_immed(tmp_b, dst, 4, 0);
 
@@ -279,7 +279,7 @@ static uint32_t *EMIT_ABCD_reg(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_p
         *ptr++ = ror(0, cc, 1);
         *ptr++ = bfi(cc, 0, 4, 1);
     }
-    
+
     // Insert into result
     *ptr++ = bfi(dst, tmp_b, 0, 8);
 
@@ -333,7 +333,7 @@ static uint32_t *EMIT_ABCD_mem(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_p
     RA_SetDirtyM68kRegister(&ptr, 8 + ((opcode >> 9) & 7));
     RA_SetDirtyM68kRegister(&ptr, 8 + (opcode & 7));
 
-    // Mask higher and lower nibbles, perform calculation. 
+    // Mask higher and lower nibbles, perform calculation.
     *ptr++ = and_immed(tmp_c, tmp_a, 4, 28);
     *ptr++ = and_immed(tmp_d, tmp_b, 4, 28);
     *ptr++ = and_immed(tmp_a, tmp_a, 4, 0);
@@ -376,7 +376,7 @@ static uint32_t *EMIT_ABCD_mem(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_p
         *ptr++ = ror(0, cc, 1);
         *ptr++ = bfi(cc, 0, 4, 1);
     }
-    
+
     // Insert into result
     *ptr++ = strb_offset(an_dst, tmp_b, 0);
 
@@ -392,7 +392,7 @@ static uint32_t *EMIT_ABCD_mem(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_p
     RA_FreeARMRegister(&ptr, tmp_b);
     RA_FreeARMRegister(&ptr, tmp_c);
     RA_FreeARMRegister(&ptr, tmp_d);
-    
+
     ptr = EMIT_AdvancePC(ptr, 2);
 
     return ptr;
@@ -408,19 +408,19 @@ static struct OpcodeDef InsnTable[512] = {
     [0200 ... 0207] = { { EMIT_AND_reg }, NULL, 0, SR_NZVC, 1, 0, 4 }, //Long
     [0220 ... 0247] = { { EMIT_AND_mem }, NULL, 0, SR_NZVC, 1, 0, 4 },
     [0250 ... 0274] = { { EMIT_AND_ext }, NULL, 0, SR_NZVC, 1, 1, 4 },
- 
+
     [0300 ... 0307] = { { EMIT_MULU }, NULL, 0, SR_NZVC, 1, 0, 2}, //_reg, //D0 Destination
     [0320 ... 0347] = { { EMIT_MULU }, NULL, 0, SR_NZVC, 1, 0, 2 }, //_mem,
     [0350 ... 0374] = { { EMIT_MULU }, NULL, 0, SR_NZVC, 1, 1, 2 }, //_ext,
- 
+
     [0400 ... 0407] = { { EMIT_ABCD_reg }, NULL, SR_XZ, SR_XZC, 1, 0, 1 }, //D0 Destination
     [0410 ... 0417] = { { EMIT_ABCD_mem }, NULL, SR_XZ, SR_XZC, 1, 0, 1 }, //-Ax),-(Ay)
     [0420 ... 0447] = { { EMIT_AND_mem }, NULL, 0, SR_NZVC, 1, 0, 1 }, //Byte
     [0450 ... 0471] = { { EMIT_AND_ext }, NULL, 0, SR_NZVC, 1, 1, 1 }, //D0 Source
- 
+
     [0500 ... 0517] = { { EMIT_EXG }, NULL, 0, 0, 1, 0, 4 }, //R0 Source, unsized always the full register
     [0520 ... 0547] = { { EMIT_AND_mem }, NULL, 0, SR_NZVC, 1, 0, 2 }, //Word
-    [0550 ... 0571] = { { EMIT_AND_ext }, NULL, 0, SR_NZVC, 1, 1, 2 }, 
+    [0550 ... 0571] = { { EMIT_AND_ext }, NULL, 0, SR_NZVC, 1, 1, 2 },
 
     [0610 ... 0617] = { { EMIT_EXG }, NULL, 0, 0, 1, 0, 4 },  //D0 Source
     [0620 ... 0647] = { { EMIT_AND_mem }, NULL, 0, SR_NZVC, 1, 0, 4 }, //Long
@@ -476,7 +476,7 @@ uint32_t GetSR_LineC(uint16_t opcode)
 int M68K_GetLineCLength(uint16_t *insn_stream)
 {
     uint16_t opcode = cache_read_16(ICACHE, (uintptr_t)insn_stream);
-    
+
     int length = 0;
     int need_ea = 0;
     int opsize = 0;

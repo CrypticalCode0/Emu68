@@ -8,10 +8,10 @@
 */
 
 #include <stdint.h>
-#include "mmu.h"
-#include "support.h"
-#include "tlsf.h"
-#include "devicetree.h"
+#include "../../include/mmu.h"
+#include "../../include/support.h"
+#include "../../include/tlsf.h"
+#include "../../include/devicetree.h"
 
 #define DV2P(x) /* x */
 #define DMAP(x) /* x */
@@ -71,7 +71,7 @@ static void *get_4k_page()
             /* Decrease the size of memory block by 2MB */
             sys_memory[block_top].mb_Size -= (1 << 21);
             uintptr_t mmu_ploc = sys_memory[block_top].mb_Base + sys_memory[block_top].mb_Size;
-            
+
             /* Update reg property */
             for (int block=0; block < block_count; block++)
             {
@@ -290,7 +290,7 @@ void mmu_init()
 
             sys_memory[block].mb_Base = addr;
             sys_memory[block].mb_Size = size;
-            
+
             range += block_size / 4;
         }
 
@@ -329,7 +329,7 @@ void mirror_page(uintptr_t virt)
             asm volatile("mrs %0, TTBR0_EL1":"=r"(tbl));
             tbl = (struct mmu_page *)((uintptr_t)tbl + PHYS_VIRT_OFFSET);
             tbl->mp_entries[idx_l1 + 4] = tbl->mp_entries[idx_l1];
-            
+
             /* Now fetch kernel table and update the topmost region, too */
             asm volatile("mrs %0, TTBR1_EL1":"=r"(tbl_kernel));
             tbl_kernel = (struct mmu_page *)((uintptr_t)tbl_kernel + PHYS_VIRT_OFFSET);

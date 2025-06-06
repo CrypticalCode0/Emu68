@@ -10,10 +10,10 @@
 #include <stdint.h>
 #include <stdarg.h>
 
-#include "devicetree.h"
-#include "support_rpi.h"
-#include "mmu.h"
-#include "tlsf.h"
+#include "../../include/devicetree.h"
+#include "../../include/support_rpi.h"
+#include "../../include/mmu.h"
+#include "../../include/tlsf.h"
 
 #ifdef PISTORM
 #include "ps_protocol.h"
@@ -69,7 +69,7 @@ void q_push(uint8_t data)
 {
     while(q_tail + Q_SIZE <= q_head)
         asm volatile("yield");
-    
+
     q_buffer[q_head & (Q_SIZE - 1)] = data;
     __sync_add_and_fetch(&q_head, 1);
     asm volatile("sev");

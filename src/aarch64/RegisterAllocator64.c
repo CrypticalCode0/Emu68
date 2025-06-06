@@ -7,10 +7,10 @@
     with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-#include "support.h"
-#include "RegisterAllocator.h"
-#include "A64.h"
-#include "M68k.h"
+#include "../../include/support.h"
+#include "../../include/RegisterAllocator.h"
+#include "../../include/A64.h"
+#include "../../include/M68k.h"
 
 static uint16_t register_pool = 0;
 static uint16_t changed_mask = 0;
@@ -24,7 +24,7 @@ void RA_ResetFPUAllocator()
 uint8_t RA_MapFPURegister(uint32_t **arm_stream, uint8_t fpu_reg)
 {
     (void)arm_stream;
-    
+
     fpu_reg &= 7;
 
     return fpu_reg + 8;
@@ -109,12 +109,12 @@ void RA_SetDirtyM68kRegister(uint32_t **arm_stream, uint8_t m68k_reg)
 /* Test if given register is a m68k register */
 int RA_IsM68kRegister(uint8_t arm_reg)
 {
-    const uint32_t test_field = 
+    const uint32_t test_field =
         (1 << REG_D0) | (1 << REG_D1) | (1 << REG_D2) | (1 << REG_D3) |
         (1 << REG_D4) | (1 << REG_D5) | (1 << REG_D6) | (1 << REG_D7) |
         (1 << REG_A0) | (1 << REG_A1) | (1 << REG_A2) | (1 << REG_A3) |
         (1 << REG_A4) | (1 << REG_A5) | (1 << REG_A6) | (1 << REG_A7);
-    
+
     if (arm_reg >= 32) return 0;
     else return (test_field & (1 << arm_reg)) != 0;
 }
@@ -529,6 +529,6 @@ uint32_t *EMIT_RestoreRegFrame(uint32_t *ptr, uint32_t mask)
         else
             *ptr++ = add64_immed(31, 31, 8*cnt_orig);
     }
-    
+
     return ptr;
 }

@@ -7,9 +7,9 @@
     with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-#include "support.h"
-#include "DuffCopy.h"
-#include "HunkLoader.h"
+#include "../include/support.h"
+#include "../include/DuffCopy.h"
+#include "../include/HunkLoader.h"
 
 #define D(x) /* */
 

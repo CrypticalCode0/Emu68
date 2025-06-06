@@ -8,14 +8,14 @@
 */
 
 #include <stdarg.h>
-#include "support.h"
+#include "../include/support.h"
 
 #define LOG2_10 3.321928094887362
 
 static double pow10_tab[] = {
     1e00, 1e01, 1e02, 1e03, 1e04, 1e05, 1e06, 1e07, 1e08,
     1e09, 1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17,
-    1e18, 1e19, 1e20, 1e21, 1e22, 1e23, 1e24, 1e25, 1e26, 
+    1e18, 1e19, 1e20, 1e21, 1e22, 1e23, 1e24, 1e25, 1e26,
     1e27, 1e28, 1e29, 1e30, 1e31
 };
 
@@ -42,12 +42,12 @@ int my_log10(double v)
     const int maxp = 308;
     const int minp = -323;
     int min = minp;
-    int max = maxp; 
+    int max = maxp;
     int mid = (max + min) / 2;
-    
+
     do {
         double p = my_pow10(mid);
-        
+
         /* If 10^mid == v then return mid */
         if (v == p) return mid;
         else
@@ -63,7 +63,7 @@ int my_log10(double v)
                 min = mid;
             }
             mid = (max + min) / 2;
-        } 
+        }
     } while ((max - min) > 1);
 
     return mid;
@@ -208,7 +208,7 @@ static void int_ftoa(char *buf, double value)
         c = (int)value;
         *buf++ = '0' + c;
     }
-    
+
     *buf++ = 'E';
     if (exp < 0)
     {
@@ -871,7 +871,7 @@ static inline void
 swapfunc(char *a, char *b, size_t n, int swaptype)
 {
 
-	if (swaptype <= 1) 
+	if (swaptype <= 1)
 		swapcode(long, a, b, n)
 	else
 		swapcode(char, a, b, n)

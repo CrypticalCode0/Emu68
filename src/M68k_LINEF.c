@@ -7,15 +7,14 @@
     with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-#include "support.h"
-#include "M68k.h"
-#include "RegisterAllocator.h"
-#include "EmuFeatures.h"
-#include "lists.h"
-#include "tlsf.h"
+#include "../include/support.h"
+#include "../include/M68k.h"
+#include "../include/RegisterAllocator.h"
+#include "../include/EmuFeatures.h"
+#include "../include/lists.h"
+#include "../include/tlsf.h"
 #include "math/libm.h"
-#include "cache.h"
-#include <cstdint>
+#include "../include/cache.h"
 
 extern uint8_t reg_Load96;
 extern uint8_t reg_Save96;

@@ -8,10 +8,10 @@
 */
 
 #include <stdint.h>
-#include "support.h"
-#include "devicetree.h"
-#include "tlsf.h"
-#include "DuffCopy.h"
+#include "../include/support.h"
+#include "../include/devicetree.h"
+#include "../include/tlsf.h"
+#include "../include/DuffCopy.h"
 
 #define NULL ((void*)0)
 
@@ -24,11 +24,11 @@ static char *strings;
 of_node_t * dt_make_node(const char *name)
 {
     of_node_t *e = NULL;
-    
+
     if (name != NULL)
     {
         e = tlsf_malloc(tlsf, sizeof(of_node_t));
-        
+
         if (e != NULL)
         {
             e->on_children = NULL;

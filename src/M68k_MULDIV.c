@@ -7,11 +7,11 @@
     with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-#include "support.h"
-#include "M68k.h"
-#include "RegisterAllocator.h"
-#include "EmuFeatures.h"
-#include "cache.h"
+#include "../include/support.h"
+#include "../include/M68k.h"
+#include "../include/RegisterAllocator.h"
+#include "../include/EmuFeatures.h"
+#include "../include/cache.h"
 
 uint32_t *EMIT_MULU(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr) __attribute__((alias("EMIT_MUL_DIV")));
 uint32_t *EMIT_MULS(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr) __attribute__((alias("EMIT_MUL_DIV")));
@@ -152,7 +152,7 @@ uint32_t *EMIT_MULS_L(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     {
         uint8_t cc = RA_ModifyCC(&ptr);
 
-        if (opcode2 & (1 << 10)) { 
+        if (opcode2 & (1 << 10)) {
             *ptr++ = cmn64_reg(31, reg_dl, LSL, 0);
         }
         else {
@@ -225,7 +225,7 @@ uint32_t *EMIT_DIVS_W(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
         RA_StoreFPCR(&ptr);
         RA_StoreFPSR(&ptr);
 
-#if EMU68_INSN_COUNTER        
+#if EMU68_INSN_COUNTER
         extern uint32_t insn_count;
         uint8_t tmp = RA_AllocARMRegister(&ptr);
         *ptr++ = mov_immed_u16(tmp, insn_count & 0xffff, 0);
@@ -234,7 +234,7 @@ uint32_t *EMIT_DIVS_W(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
         }
         *ptr++ = fmov_from_reg(0, tmp);
         *ptr++ = vadd_2d(30, 30, 0);
-        
+
         RA_FreeARMRegister(&ptr, tmp);
 #endif
 
@@ -334,8 +334,8 @@ uint32_t *EMIT_DIVU_W(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
         RA_StoreCC(&ptr);
         RA_StoreFPCR(&ptr);
         RA_StoreFPSR(&ptr);
-        
-#if EMU68_INSN_COUNTER        
+
+#if EMU68_INSN_COUNTER
         extern uint32_t insn_count;
         uint8_t tmp = RA_AllocARMRegister(&ptr);
         *ptr++ = mov_immed_u16(tmp, insn_count & 0xffff, 0);
@@ -344,7 +344,7 @@ uint32_t *EMIT_DIVU_W(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
         }
         *ptr++ = fmov_from_reg(0, tmp);
         *ptr++ = vadd_2d(30, 30, 0);
-        
+
         RA_FreeARMRegister(&ptr, tmp);
 #endif
         /* Return here */
@@ -363,7 +363,7 @@ uint32_t *EMIT_DIVU_W(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
         *ptr++ = udiv(reg_quot, reg_a, reg_q);
         *ptr++ = msub(reg_rem, reg_a, reg_quot, reg_q);
     }
-        
+
     uint8_t tmp = RA_AllocARMRegister(&ptr);
 
     *ptr++ = uxth(tmp, reg_quot);
@@ -391,7 +391,7 @@ uint32_t *EMIT_DIVU_W(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
         ptr = EMIT_ClearFlags(ptr, cc, alt_mask);
 
         if (update_mask & SR_V) {
-            
+
             ptr = EMIT_SetFlagsConditional(ptr, cc, SR_Valt, ARM_CC_NE);
         }
 
@@ -455,8 +455,8 @@ uint32_t *EMIT_DIVUS_L(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
         RA_StoreCC(&ptr);
         RA_StoreFPCR(&ptr);
         RA_StoreFPSR(&ptr);
-        
-#if EMU68_INSN_COUNTER        
+
+#if EMU68_INSN_COUNTER
         extern uint32_t insn_count;
         uint8_t tmp = RA_AllocARMRegister(&ptr);
         *ptr++ = mov_immed_u16(tmp, insn_count & 0xffff, 0);
@@ -465,7 +465,7 @@ uint32_t *EMIT_DIVUS_L(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
         }
         *ptr++ = fmov_from_reg(0, tmp);
         *ptr++ = vadd_2d(30, 30, 0);
-        
+
         RA_FreeARMRegister(&ptr, tmp);
 #endif
         /* Return here */
