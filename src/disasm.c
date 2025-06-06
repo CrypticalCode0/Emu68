@@ -1,5 +1,5 @@
-#include <capstone/capstone.h>
-#include <tlsf.h>
+#include "../external/capstone/include/capstone/capstone.h"
+#include "../include/tlsf.h"
 #include <support.h>
 #include <stdarg.h>
 
@@ -134,7 +134,7 @@ void disasm_print(uint16_t *m68k_addr, uint16_t m68k_count, uint32_t *arm_addr, 
 				fixed_op_str[p] = 0;
 				break;
 			}
-			
+
 			if (insn_arm[i].op_str[j] == 'w')
 				size = 'w';
 			else if (insn_arm[i].op_str[j] == 'x' && last_char != '0')

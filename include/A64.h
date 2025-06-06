@@ -249,34 +249,34 @@ static inline uint32_t strb_offset_postindex(uint8_t rn, uint8_t rt, int16_t off
 static inline uint32_t strb_offset_preindex(uint8_t rn, uint8_t rt, int16_t offset9) { ASSERT_REG(rt); ASSERT_REG(rn); return I32(0x38000c00 | (rt & 31) | ((rn & 31) << 5) | ((offset9 & 0x1ff) << 12)); }
 
 /* Load/Store exclusive */
-static inline uint32_t ldxr(uint8_t rn, uint8_t rt) { ASSERT_REG(rt); ASSERT_REG(rn); return I32(0x885f7c00 | ((rn & 31) << 5) | (rt & 31)); } 
-static inline uint32_t ldxr64(uint8_t rn, uint8_t rt) { ASSERT_REG(rt); ASSERT_REG(rn); return I32(0xc85f7c00 | ((rn & 31) << 5) | (rt & 31)); } 
-static inline uint32_t ldxrh(uint8_t rn, uint8_t rt) { ASSERT_REG(rt); ASSERT_REG(rn); return I32(0x485f7c00 | ((rn & 31) << 5) | (rt & 31)); } 
-static inline uint32_t ldxrb(uint8_t rn, uint8_t rt) { ASSERT_REG(rt); ASSERT_REG(rn); return I32(0x085f7c00 | ((rn & 31) << 5) | (rt & 31)); } 
-static inline uint32_t ldxp(uint8_t rn, uint8_t rt, uint8_t rt2) { ASSERT_REG(rt); ASSERT_REG(rn); ASSERT_REG(rt2); return I32(0x887f0000 | ((rt2 & 31) << 10) | ((rn & 31) << 5) | (rt & 31)); } 
-static inline uint32_t ldxp64(uint8_t rn, uint8_t rt, uint8_t rt2) { ASSERT_REG(rt); ASSERT_REG(rn); ASSERT_REG(rt2); return I32(0xc87f0000 | ((rt2 & 31) << 10) | ((rn & 31) << 5) | (rt & 31)); } 
+static inline uint32_t ldxr(uint8_t rn, uint8_t rt) { ASSERT_REG(rt); ASSERT_REG(rn); return I32(0x885f7c00 | ((rn & 31) << 5) | (rt & 31)); }
+static inline uint32_t ldxr64(uint8_t rn, uint8_t rt) { ASSERT_REG(rt); ASSERT_REG(rn); return I32(0xc85f7c00 | ((rn & 31) << 5) | (rt & 31)); }
+static inline uint32_t ldxrh(uint8_t rn, uint8_t rt) { ASSERT_REG(rt); ASSERT_REG(rn); return I32(0x485f7c00 | ((rn & 31) << 5) | (rt & 31)); }
+static inline uint32_t ldxrb(uint8_t rn, uint8_t rt) { ASSERT_REG(rt); ASSERT_REG(rn); return I32(0x085f7c00 | ((rn & 31) << 5) | (rt & 31)); }
+static inline uint32_t ldxp(uint8_t rn, uint8_t rt, uint8_t rt2) { ASSERT_REG(rt); ASSERT_REG(rn); ASSERT_REG(rt2); return I32(0x887f0000 | ((rt2 & 31) << 10) | ((rn & 31) << 5) | (rt & 31)); }
+static inline uint32_t ldxp64(uint8_t rn, uint8_t rt, uint8_t rt2) { ASSERT_REG(rt); ASSERT_REG(rn); ASSERT_REG(rt2); return I32(0xc87f0000 | ((rt2 & 31) << 10) | ((rn & 31) << 5) | (rt & 31)); }
 
-static inline uint32_t stxr(uint8_t rn, uint8_t rt, uint8_t rs) { ASSERT_REG(rt); ASSERT_REG(rn); return I32(0x88007c00 | ((rs & 31) << 16) | ((rn & 31) << 5) | (rt & 31)); } 
-static inline uint32_t stxr64(uint8_t rn, uint8_t rt, uint8_t rs) { ASSERT_REG(rt); ASSERT_REG(rn); return I32(0xc8007c00 | ((rs & 31) << 16) | ((rn & 31) << 5) | (rt & 31)); } 
-static inline uint32_t stxrh(uint8_t rn, uint8_t rt, uint8_t rs) { ASSERT_REG(rt); ASSERT_REG(rn); return I32(0x48007c00 | ((rs & 31) << 16) | ((rn & 31) << 5) | (rt & 31)); } 
-static inline uint32_t stxrb(uint8_t rn, uint8_t rt, uint8_t rs) { ASSERT_REG(rt); ASSERT_REG(rn); return I32(0x08007c00 | ((rs & 31) << 16) | ((rn & 31) << 5) | (rt & 31)); } 
-static inline uint32_t stxp(uint8_t rn, uint8_t rt, uint8_t rt2, uint8_t rs) { ASSERT_REG(rt); ASSERT_REG(rn); ASSERT_REG(rt2); ASSERT_REG(rs); return I32(0x88200000 | ((rs & 31) << 16) | ((rt2 & 31) << 10) | ((rn & 31) << 5) | (rt & 31)); } 
-static inline uint32_t stxp64(uint8_t rn, uint8_t rt, uint8_t rt2, uint8_t rs) { ASSERT_REG(rt); ASSERT_REG(rn); ASSERT_REG(rt2); ASSERT_REG(rs); return I32(0xc8200000 | ((rs & 31) << 16) | ((rt2 & 31) << 10) | ((rn & 31) << 5) | (rt & 31)); } 
+static inline uint32_t stxr(uint8_t rn, uint8_t rt, uint8_t rs) { ASSERT_REG(rt); ASSERT_REG(rn); return I32(0x88007c00 | ((rs & 31) << 16) | ((rn & 31) << 5) | (rt & 31)); }
+static inline uint32_t stxr64(uint8_t rn, uint8_t rt, uint8_t rs) { ASSERT_REG(rt); ASSERT_REG(rn); return I32(0xc8007c00 | ((rs & 31) << 16) | ((rn & 31) << 5) | (rt & 31)); }
+static inline uint32_t stxrh(uint8_t rn, uint8_t rt, uint8_t rs) { ASSERT_REG(rt); ASSERT_REG(rn); return I32(0x48007c00 | ((rs & 31) << 16) | ((rn & 31) << 5) | (rt & 31)); }
+static inline uint32_t stxrb(uint8_t rn, uint8_t rt, uint8_t rs) { ASSERT_REG(rt); ASSERT_REG(rn); return I32(0x08007c00 | ((rs & 31) << 16) | ((rn & 31) << 5) | (rt & 31)); }
+static inline uint32_t stxp(uint8_t rn, uint8_t rt, uint8_t rt2, uint8_t rs) { ASSERT_REG(rt); ASSERT_REG(rn); ASSERT_REG(rt2); ASSERT_REG(rs); return I32(0x88200000 | ((rs & 31) << 16) | ((rt2 & 31) << 10) | ((rn & 31) << 5) | (rt & 31)); }
+static inline uint32_t stxp64(uint8_t rn, uint8_t rt, uint8_t rt2, uint8_t rs) { ASSERT_REG(rt); ASSERT_REG(rn); ASSERT_REG(rt2); ASSERT_REG(rs); return I32(0xc8200000 | ((rs & 31) << 16) | ((rt2 & 31) << 10) | ((rn & 31) << 5) | (rt & 31)); }
 
 /* Load-Acquire/Store-Release exclusive */
-static inline uint32_t ldaxr(uint8_t rn, uint8_t rt) { ASSERT_REG(rt); ASSERT_REG(rn); return I32(0x885ffc00 | ((rn & 31) << 5) | (rt & 31)); } 
-static inline uint32_t ldaxr64(uint8_t rn, uint8_t rt) { ASSERT_REG(rt); ASSERT_REG(rn); return I32(0xc85ffc00 | ((rn & 31) << 5) | (rt & 31)); } 
-static inline uint32_t ldaxrh(uint8_t rn, uint8_t rt) { ASSERT_REG(rt); ASSERT_REG(rn); return I32(0x485ffc00 | ((rn & 31) << 5) | (rt & 31)); } 
-static inline uint32_t ldaxrb(uint8_t rn, uint8_t rt) { ASSERT_REG(rt); ASSERT_REG(rn); return I32(0x085ffc00 | ((rn & 31) << 5) | (rt & 31)); } 
-static inline uint32_t ldaxp(uint8_t rn, uint8_t rt, uint8_t rt2) { ASSERT_REG(rt); ASSERT_REG(rt2); ASSERT_REG(rn); return I32(0x887f8000 | ((rt2 & 31) << 10) | ((rn & 31) << 5) | (rt & 31)); } 
-static inline uint32_t ldaxp64(uint8_t rn, uint8_t rt, uint8_t rt2) { ASSERT_REG(rt); ASSERT_REG(rt2); ASSERT_REG(rn); return I32(0xc87f8000 | ((rt2 & 31) << 10) | ((rn & 31) << 5) | (rt & 31)); } 
+static inline uint32_t ldaxr(uint8_t rn, uint8_t rt) { ASSERT_REG(rt); ASSERT_REG(rn); return I32(0x885ffc00 | ((rn & 31) << 5) | (rt & 31)); }
+static inline uint32_t ldaxr64(uint8_t rn, uint8_t rt) { ASSERT_REG(rt); ASSERT_REG(rn); return I32(0xc85ffc00 | ((rn & 31) << 5) | (rt & 31)); }
+static inline uint32_t ldaxrh(uint8_t rn, uint8_t rt) { ASSERT_REG(rt); ASSERT_REG(rn); return I32(0x485ffc00 | ((rn & 31) << 5) | (rt & 31)); }
+static inline uint32_t ldaxrb(uint8_t rn, uint8_t rt) { ASSERT_REG(rt); ASSERT_REG(rn); return I32(0x085ffc00 | ((rn & 31) << 5) | (rt & 31)); }
+static inline uint32_t ldaxp(uint8_t rn, uint8_t rt, uint8_t rt2) { ASSERT_REG(rt); ASSERT_REG(rt2); ASSERT_REG(rn); return I32(0x887f8000 | ((rt2 & 31) << 10) | ((rn & 31) << 5) | (rt & 31)); }
+static inline uint32_t ldaxp64(uint8_t rn, uint8_t rt, uint8_t rt2) { ASSERT_REG(rt); ASSERT_REG(rt2); ASSERT_REG(rn); return I32(0xc87f8000 | ((rt2 & 31) << 10) | ((rn & 31) << 5) | (rt & 31)); }
 
-static inline uint32_t stlxr(uint8_t rn, uint8_t rt, uint8_t rs) { ASSERT_REG(rt); ASSERT_REG(rn); ASSERT_REG(rs); return I32(0x8800fc00 | ((rs & 31) << 16) | ((rn & 31) << 5) | (rt & 31)); } 
-static inline uint32_t stlxr64(uint8_t rn, uint8_t rt, uint8_t rs) { ASSERT_REG(rt); ASSERT_REG(rn); ASSERT_REG(rs); return I32(0xc800fc00 | ((rs & 31) << 16) | ((rn & 31) << 5) | (rt & 31)); } 
-static inline uint32_t stlxrh(uint8_t rn, uint8_t rt, uint8_t rs) { ASSERT_REG(rt); ASSERT_REG(rn); ASSERT_REG(rs); return I32(0x4800fc00 | ((rs & 31) << 16) | ((rn & 31) << 5) | (rt & 31)); } 
-static inline uint32_t stlxrb(uint8_t rn, uint8_t rt, uint8_t rs) { ASSERT_REG(rt); ASSERT_REG(rn); ASSERT_REG(rs); return I32(0x0800fc00 | ((rs & 31) << 16) | ((rn & 31) << 5) | (rt & 31)); } 
-static inline uint32_t stlxp(uint8_t rn, uint8_t rt, uint8_t rt2, uint8_t rs) { ASSERT_REG(rt); ASSERT_REG(rt2); ASSERT_REG(rn); ASSERT_REG(rs); return I32(0x88208000 | ((rs & 31) << 16) | ((rt2 & 31) << 10) | ((rn & 31) << 5) | (rt & 31)); } 
-static inline uint32_t stlxp64(uint8_t rn, uint8_t rt, uint8_t rt2, uint8_t rs) { ASSERT_REG(rt); ASSERT_REG(rt2); ASSERT_REG(rn); ASSERT_REG(rs); return I32(0xc8208000 | ((rs & 31) << 16) | ((rt2 & 31) << 10) | ((rn & 31) << 5) | (rt & 31)); } 
+static inline uint32_t stlxr(uint8_t rn, uint8_t rt, uint8_t rs) { ASSERT_REG(rt); ASSERT_REG(rn); ASSERT_REG(rs); return I32(0x8800fc00 | ((rs & 31) << 16) | ((rn & 31) << 5) | (rt & 31)); }
+static inline uint32_t stlxr64(uint8_t rn, uint8_t rt, uint8_t rs) { ASSERT_REG(rt); ASSERT_REG(rn); ASSERT_REG(rs); return I32(0xc800fc00 | ((rs & 31) << 16) | ((rn & 31) << 5) | (rt & 31)); }
+static inline uint32_t stlxrh(uint8_t rn, uint8_t rt, uint8_t rs) { ASSERT_REG(rt); ASSERT_REG(rn); ASSERT_REG(rs); return I32(0x4800fc00 | ((rs & 31) << 16) | ((rn & 31) << 5) | (rt & 31)); }
+static inline uint32_t stlxrb(uint8_t rn, uint8_t rt, uint8_t rs) { ASSERT_REG(rt); ASSERT_REG(rn); ASSERT_REG(rs); return I32(0x0800fc00 | ((rs & 31) << 16) | ((rn & 31) << 5) | (rt & 31)); }
+static inline uint32_t stlxp(uint8_t rn, uint8_t rt, uint8_t rt2, uint8_t rs) { ASSERT_REG(rt); ASSERT_REG(rt2); ASSERT_REG(rn); ASSERT_REG(rs); return I32(0x88208000 | ((rs & 31) << 16) | ((rt2 & 31) << 10) | ((rn & 31) << 5) | (rt & 31)); }
+static inline uint32_t stlxp64(uint8_t rn, uint8_t rt, uint8_t rt2, uint8_t rs) { ASSERT_REG(rt); ASSERT_REG(rt2); ASSERT_REG(rn); ASSERT_REG(rs); return I32(0xc8208000 | ((rs & 31) << 16) | ((rt2 & 31) << 10) | ((rn & 31) << 5) | (rt & 31)); }
 
 /* Load/Store pair */
 static inline uint32_t ldp(uint8_t rn, uint8_t rt1, uint8_t rt2, int16_t imm) { ASSERT_REG(rn); ASSERT_REG(rt1); ASSERT_REG(rt2); return I32(0x29400000 | (rt1 & 31) | ((rt2 & 31) << 10) | ((rn & 31) << 5) | (((imm / 4) & 0x7f) << 15)); }
@@ -650,7 +650,7 @@ static inline uint32_t ftosidrz(uint8_t s_dst, uint8_t d_src) { return ftosidrz_
 #endif
 
 
-#include <RegisterAllocator.h>
+#include "RegisterAllocator.h"
 
 static inline __attribute__((always_inline))
 uint32_t * EMIT_GetFPUFlags(uint32_t * ptr, uint8_t fpsr)
@@ -835,7 +835,7 @@ uint32_t * EMIT_GetNZxx(uint32_t * ptr, uint8_t cc, uint8_t *not_done)
         (*not_done) &= 0x13;
     }
     RA_FreeARMRegister(&ptr, tmp_reg);
-    
+
     return ptr;
 }
 
@@ -1001,19 +1001,19 @@ uint32_t * EMIT_GetNZnCV(uint32_t * ptr, uint8_t cc, uint8_t *not_done)
                 break;
         }
     }
-    else 
+    else
     {
         *ptr++ = get_nzcv(tmp_reg);
-        
+
         /* If C is needed, inverse it */
         if (*not_done & 0x01)
             *ptr++ = eor_immed(tmp_reg, tmp_reg, 1, 3);
 
         *ptr++ = bfxil(cc, tmp_reg, 28, 4);
-        
+
         (*not_done) &= 0x10;
     }
-    
+
     if (*not_done) {
         uint8_t clr_flags = *not_done;
         if ((clr_flags & 3) != 0 && (clr_flags & 3) < 3)
@@ -1094,7 +1094,7 @@ uint32_t * EMIT_GetNZnCVX(uint32_t * ptr, uint8_t cc, uint8_t *not_done)
         if ((clr_flags & 3) != 0 && (clr_flags & 3) < 3)
             clr_flags ^= 3;
         ptr = EMIT_ClearFlags(ptr, cc, clr_flags);
-    }   
+    }
 
     RA_FreeARMRegister(&ptr, tmp_reg);
 
@@ -1197,7 +1197,7 @@ uint32_t * EMIT_SetFlagsConditional(uint32_t * ptr, uint8_t cc, uint8_t flags, u
             *ptr++ = orr_immed(tmp_reg, cc, 1, 0);
             *ptr++ = csel(cc, tmp_reg, cc, cond);
             break;
-        
+
         case 3:
             *ptr++ = orr_immed(tmp_reg, cc, 2, 0);
             *ptr++ = csel(cc, tmp_reg, cc, cond);

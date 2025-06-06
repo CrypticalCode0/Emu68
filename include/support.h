@@ -25,6 +25,7 @@
 #define xstr(s) str(s)
 #define str(s) #s
 
+#define _abs(x) ((x) < 0 ? -(x) : (x))
 #define xstr(s) str(s)
 #define str(s) #s
 typedef struct {
