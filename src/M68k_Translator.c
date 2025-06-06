@@ -7,19 +7,18 @@
     with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-#include <cstdint>
 #define _GNU_SOURCE 1
 
-#include "support.h"
-#include "EmuFeatures.h"
-#include "M68k.h"
-#include "RegisterAllocator.h"
-#include "lists.h"
-#include "tlsf.h"
-#include "config.h"
-#include "DuffCopy.h"
-#include "disasm.h"
-#include "cache.h"
+#include "../include/support.h"
+#include "../include/EmuFeatures.h"
+#include "../include/M68k.h"
+#include "../include/RegisterAllocator.h"
+#include "../include/lists.h"
+#include "../include/tlsf.h"
+#include "../include/config.h"
+#include "../include/DuffCopy.h"
+#include "../include/disasm.h"
+#include "../include/cache.h"
 
 #if SET_FEATURES_AT_RUNTIME
 features_t Features;

@@ -1,6 +1,6 @@
 #include "../external/capstone/include/capstone/capstone.h"
 #include "../include/tlsf.h"
-#include <../include/support.h>
+#include "../include/support.h"
 #include <stdarg.h>
 
 extern void *tlsf;

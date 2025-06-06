@@ -8,7 +8,7 @@
 */
 
 #include <stdint.h>
-#include "config.h"
+#include "../../include/config.h"
 
 void boot(uintptr_t dummy, uintptr_t arch, uintptr_t atags, uintptr_t dummy2);
 

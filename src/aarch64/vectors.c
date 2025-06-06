@@ -8,13 +8,13 @@
 */
 
 #include <stdint.h>
-#include "A64.h"
-#include "config.h"
-#include "support.h"
-#include "mmu.h"
-#include "tlsf.h"
-#include "M68k.h"
-#include "cache.h"
+#include "../../include/A64.h"
+#include "../../include/config.h"
+#include "../../include/support.h"
+#include "../../include/mmu.h"
+#include "../../include/tlsf.h"
+#include "../../include/M68k.h"
+#include "../../include/cache.h"
 
 #define FULL_CONTEXT 1
 
@@ -97,7 +97,7 @@ void  __attribute__((used)) __stub_vectors()
 { asm volatile(
 "       .section .vectors               \n"
 "       .balign 0x800                   \n"
-"curr_el_sp0_sync:                      \n" // The exception handler for a synchronous 
+"curr_el_sp0_sync:                      \n" // The exception handler for a synchronous
         SAVE_CONTEXT                        // exception from the current EL using SP0.
 "       mov x0, #0                      \n"
 "       mov x1, sp                      \n"
@@ -121,7 +121,7 @@ void  __attribute__((used)) __stub_vectors()
 "       b ExceptionExit                 \n"
 "                                       \n"
 "       .balign 0x80                    \n"
-"curr_el_sp0_serror:                    \n" // The exception handler for a System Error 
+"curr_el_sp0_serror:                    \n" // The exception handler for a System Error
         SAVE_CONTEXT                        // exception from the current EL using SP0.
 "       mov x0, #0x180                  \n"
 "       mov x1, sp                      \n"
@@ -129,7 +129,7 @@ void  __attribute__((used)) __stub_vectors()
 "       b ExceptionExit                 \n"
 "                                       \n"
 "       .balign 0x80                    \n"
-"curr_el_spx_sync:                      \n" // The exception handler for a synchrous 
+"curr_el_spx_sync:                      \n" // The exception handler for a synchrous
         SAVE_CONTEXT                        // exception from the current EL using the
 "       mov x0, #0x200                  \n" // current SP.
 "       mov x1, sp                      \n"
@@ -137,7 +137,7 @@ void  __attribute__((used)) __stub_vectors()
 "       b ExceptionExit                 \n"
 "                                       \n"
 "       .balign 0x80                    \n"
-"curr_el_spx_irq:                       \n" // The exception handler for an IRQ exception from 
+"curr_el_spx_irq:                       \n" // The exception handler for an IRQ exception from
 "       stp x0, x1, [sp, -16]!          \n" // the current EL using the current SP.
 "       mrs x0, SPSR_EL1                \n" // Get SPSR
 "       orr x0, x0, #0x080              \n" // Disable IRQ interrupt so that we are not disturbed on return
@@ -157,7 +157,7 @@ void  __attribute__((used)) __stub_vectors()
 "       eret                            \n"
 "                                       \n"
 "       .balign 0x80                    \n"
-"curr_el_spx_fiq:                       \n" // The exception handler for an FIQ from 
+"curr_el_spx_fiq:                       \n" // The exception handler for an FIQ from
 "       stp x0, x1, [sp, -16]!          \n" // the current EL using the current SP.
 "       mrs x0, SPSR_EL1                \n" // Get SPSR
 "       orr x0, x0, #0x0c0              \n" // Disable IRQ and FIQ interrupts so that we are not disturbed on return
@@ -177,7 +177,7 @@ void  __attribute__((used)) __stub_vectors()
 "       eret                            \n"
 "                                       \n"
 "       .balign 0x80                    \n"
-"curr_el_spx_serror:                    \n" // The exception handler for a System Error 
+"curr_el_spx_serror:                    \n" // The exception handler for a System Error
 "       stp x0, x1, [sp, -16]!          \n" // exception from the current EL using the
 "       mrs x0, SPSR_EL1                \n" // Get SPSR
 "       orr x0, x0, #0x1c0              \n" // Disable SError, IRQ and FIQ interrupts so that we are not disturbed on return
@@ -189,7 +189,7 @@ void  __attribute__((used)) __stub_vectors()
 "       eret                            \n"
 "                                       \n"
 "       .balign 0x80                    \n"
-"lower_el_aarch64_sync:                 \n" // The exception handler for a synchronous 
+"lower_el_aarch64_sync:                 \n" // The exception handler for a synchronous
         SAVE_CONTEXT                        // exception from a lower EL (AArch64).
 "       mov x0, #0x400                  \n"
 "       mov x1, sp                      \n"
@@ -213,7 +213,7 @@ void  __attribute__((used)) __stub_vectors()
 "       b ExceptionExit                 \n"
 "                                       \n"
 "       .balign 0x80                    \n"
-"lower_el_aarch64_serror:               \n" // The exception handler for a System Error 
+"lower_el_aarch64_serror:               \n" // The exception handler for a System Error
         SAVE_CONTEXT                        // exception from a lower EL(AArch64).
 "       mov x0, #0x580                  \n"
 "       mov x1, sp                      \n"
@@ -221,7 +221,7 @@ void  __attribute__((used)) __stub_vectors()
 "       b ExceptionExit                 \n"
 "                                       \n"
 "       .balign 0x80                    \n"
-"lower_el_aarch32_sync:                 \n" // The exception handler for a synchronous 
+"lower_el_aarch32_sync:                 \n" // The exception handler for a synchronous
         SAVE_CONTEXT                        // exception from a lower EL (AArch32).
 "       mov x0, #0x600                  \n"
 "       mov x1, sp                      \n"
@@ -245,7 +245,7 @@ void  __attribute__((used)) __stub_vectors()
 "       b ExceptionExit                 \n"
 "                                       \n"
 "       .balign 0x80                    \n"
-"lower_el_aarch32_serror:               \n" // The exception handler for a System Error 
+"lower_el_aarch32_serror:               \n" // The exception handler for a System Error
         SAVE_CONTEXT                        // exception from a lower EL(AArch32).
 "       mov x0, #0x780                  \n"
 "       mov x1, sp                      \n"
@@ -420,11 +420,11 @@ int SYSWriteValToAddr(uint64_t value, uint64_t value2, int size, uint64_t far)
                 board_idx++;
             }
         }
-        
+
         if (far == 0xe8004c || far == 0xe8004e) {
             board_idx++;
         }
- 
+
         return 1;
     }
 
@@ -472,7 +472,7 @@ int SYSWriteValToAddr(uint64_t value, uint64_t value2, int size, uint64_t far)
 
 
 int SYSReadValFromAddr(uint64_t *value, uint64_t *value2, int size, uint64_t far)
-{  
+{
     D(kprintf("[JIT:SYS] SYSReadValFromAddr(%d, %p)\n", size, far));
 
     /*
@@ -513,7 +513,7 @@ int SYSReadValFromAddr(uint64_t *value, uint64_t *value2, int size, uint64_t far
 
         if (board[board_idx])
         {
-            
+
             const uint8_t *rom = board[board_idx]->rom_file;
             *value = rom[far - 0xe80000];
 
@@ -640,7 +640,7 @@ int SYSReadValFromAddr(uint64_t *value, uint64_t *value2, int size, uint64_t far
 int SYSWriteValToAddr(uint64_t value, uint64_t value2, int size, uint64_t far)
 {
     D(kprintf("[JIT:SYS] SYSWriteValToAddr(0x%x, %d, %p)\n", value, size, far));
-    
+
     switch(size)
     {
         case 1:
@@ -667,7 +667,7 @@ int SYSWriteValToAddr(uint64_t value, uint64_t value2, int size, uint64_t far)
 int SYSReadValFromAddr(uint64_t *value, uint64_t *value2, int size, uint64_t far)
 {
     D(kprintf("[JIT:SYS] SYSReadValFromAddr(%d, %p)\n", size, far));
-    
+
     switch(size)
     {
         case 1:
@@ -729,7 +729,7 @@ int SYSValidateUnit(uint32_t vector, uint64_t *ctx, uint64_t elr, uint64_t spsr,
     else
     {
         unit = M68K_GetTranslationUnit(m68k_pc);
-        
+
         if (unit)
         {
             // Put simple return function to elr
@@ -1102,7 +1102,7 @@ int SYSPageFaultWriteHandler(uint32_t vector, uint64_t *ctx, uint64_t elr, uint6
 
         // Pre-index?
         if (pre_index) ptr += offset;
-        
+
         if (ptr != far)
         {
             DWARN(kprintf("address mismatch in STR %c%d %s-index. FAR = %08x, reg = %08x!\n", size == 4 ? 'S' : 'D', opcode & 31, pre_index ? "pre":"post",far, ptr));
@@ -1179,14 +1179,14 @@ int SYSPageFaultWriteHandler(uint32_t vector, uint64_t *ctx, uint64_t elr, uint6
         {
             DWARN(kprintf("address mismatch in STR %c%d reg FAR = %08x, reg = %08x!\n", size == 4 ? 'S' : 'D', opcode & 31, far, ptr));
             far = ptr + rm;
-        }        
+        }
 
         handled = SYSWriteValToAddr(value, 0, size, far);
     }
     /**** Integer stores ****/
     /* STUR */
     else if ((opcode & 0x3fe00c00) == 0x38000000)
-    {   
+    {
         if ((opcode & 31) == 31)
             value = 0;
         else
@@ -1211,7 +1211,7 @@ int SYSPageFaultWriteHandler(uint32_t vector, uint64_t *ctx, uint64_t elr, uint6
         int16_t offset = ((int16_t)(opcode >> 5)) >> 7;
 
         // Pre-index?
-        if (pre_index) 
+        if (pre_index)
         {
             ptr += offset;
         }
@@ -1220,7 +1220,7 @@ int SYSPageFaultWriteHandler(uint32_t vector, uint64_t *ctx, uint64_t elr, uint6
             value = 0;
         else
             value = ctx[opcode & 31];
-        
+
         if (ptr != far)
         {
             kprintf("address mismatch in STR %c%d %s-index. FAR = %08x, reg = %08x!\n", size == 4 ? 'W' : 'X', opcode & 31, pre_index ? "pre":"post",far, ptr);
@@ -1228,7 +1228,7 @@ int SYSPageFaultWriteHandler(uint32_t vector, uint64_t *ctx, uint64_t elr, uint6
         }
 
         handled = SYSWriteValToAddr(value, 0, size, far);
-        
+
         ctx[(opcode >> 5) & 31] += offset;
     }
     /* STR unsigned offset */
@@ -1296,7 +1296,7 @@ int SYSPageFaultWriteHandler(uint32_t vector, uint64_t *ctx, uint64_t elr, uint6
         {
             kprintf("address mismatch in STR %c%d reg FAR = %08x, reg = %08x!\n", size == 4 ? 'W' : 'X', opcode & 31, far, ptr);
             far = ptr + rm;
-        }  
+        }
 
         handled = SYSWriteValToAddr(value, 0, size, far);
     }
@@ -1355,7 +1355,7 @@ int SYSPageFaultWriteHandler(uint32_t vector, uint64_t *ctx, uint64_t elr, uint6
         else
         {
             uint128_t v;
-            
+
             if ((opcode & 31) == 31)
                 v.hi = 0;
             else
@@ -1379,14 +1379,14 @@ int SYSPageFaultWriteHandler(uint32_t vector, uint64_t *ctx, uint64_t elr, uint6
             size = 4;
 
         offset *= size;
-    
+
         uint64_t ptr = ctx[(opcode >> 5) & 31];
         if (ptr != far)
         {
             kprintf("address mismatch in STP post index far = %08x, reg = %08x, off = %d!\n", far, ptr, offset);
             far = ptr;
         }
-        
+
 
         if (size == 4)
         {
@@ -1405,7 +1405,7 @@ int SYSPageFaultWriteHandler(uint32_t vector, uint64_t *ctx, uint64_t elr, uint6
         else
         {
             uint128_t v;
-            
+
             if ((opcode & 31) == 31)
                 v.hi = 0;
             else
@@ -1431,14 +1431,14 @@ int SYSPageFaultWriteHandler(uint32_t vector, uint64_t *ctx, uint64_t elr, uint6
             size = 4;
 
         offset *= size;
-        
+
         uint64_t ptr = ctx[(opcode >> 5) & 31];
         if (ptr + offset != far)
         {
             kprintf("address mismatch in STP pre index far = %08x, reg = %08x, off = %d!\n", far, ptr, offset);
             far = ptr + offset;
-        } 
-        
+        }
+
         if (size == 4)
         {
             if ((opcode & 31) == 31)
@@ -1456,7 +1456,7 @@ int SYSPageFaultWriteHandler(uint32_t vector, uint64_t *ctx, uint64_t elr, uint6
         else
         {
             uint128_t v;
-            
+
             if ((opcode & 31) == 31)
                 v.hi = 0;
             else
@@ -1474,7 +1474,7 @@ int SYSPageFaultWriteHandler(uint32_t vector, uint64_t *ctx, uint64_t elr, uint6
     }
 
     if (!handled)
-    {    
+    {
         kprintf("[JIT:SYS] Unhandled page fault: opcode %08x, write to %p\n", opcode, far);
     }
 
@@ -1712,14 +1712,14 @@ int SYSPageFaultReadHandler(uint32_t vector, uint64_t *ctx, uint64_t elr, uint64
         {
             handled = SYSReadValFromAddr(&ctx[opcode & 31], &ctx[(opcode >> 10) & 31], 16, far);
         }
-            
+
         ctx[(opcode >> 5) & 31] += offset;
     }
     /* LDPSW */
     if ((opcode & 0xffc00000) == 0x69400000)
     {
         size = 4;
-        
+
         int16_t offset = size * (((int16_t)(opcode >> 6)) >> 9);
         uint64_t ptr = ctx[(opcode >> 5) & 31];
         if (ptr + offset != far)
@@ -1747,7 +1747,7 @@ int SYSPageFaultReadHandler(uint32_t vector, uint64_t *ctx, uint64_t elr, uint64
         int16_t offset = ((int16_t)(opcode >> 6)) >> 9;
         size = 4;
         offset *= size;
-        
+
         uint64_t ptr = ctx[(opcode >> 5) & 31];
         if (ptr != far)
         {
@@ -1809,7 +1809,7 @@ int SYSPageFaultReadHandler(uint32_t vector, uint64_t *ctx, uint64_t elr, uint64
             size = 4;
         if (opcode & 0x80000000)
             sext = 1;
-        
+
         handled = SYSReadValFromAddr(&ctx[opcode & 31], NULL, size, far);
         if (handled & sext) {
             if (ctx[opcode & 31] & 0x80000000)
@@ -1858,7 +1858,7 @@ int SYSPageFaultReadHandler(uint32_t vector, uint64_t *ctx, uint64_t elr, uint64
         {
             kprintf("address mismatch in LDR %c%d reg FAR = %08x, reg = %08x!\n", size == 4 ? 'W' : 'X', opcode & 31, far, ptr);
             far = ptr + rm;
-        }  
+        }
 
         handled = SYSReadValFromAddr(&ctx[opcode & 31], NULL, size, far);
     }
@@ -1919,7 +1919,7 @@ int SYSPageFaultReadHandler(uint32_t vector, uint64_t *ctx, uint64_t elr, uint64
         }
 
         handled = SYSReadValFromAddr(&ctx[opcode & 31], NULL, size, far);
-        
+
         if (handled)
             ctx[(opcode >> 5) & 31] += offset;
     }
@@ -1929,7 +1929,7 @@ int SYSPageFaultReadHandler(uint32_t vector, uint64_t *ctx, uint64_t elr, uint64
         int sext64 = 1;
         if (opcode & (1 << 22))
             sext64 = 0;
-        
+
         int option = (opcode >> 13) & 7;
         int s = (opcode & 0x1000);
 
@@ -1969,7 +1969,7 @@ int SYSPageFaultReadHandler(uint32_t vector, uint64_t *ctx, uint64_t elr, uint64
         {
             kprintf("address mismatch in LDRSW/B/H %c%d reg FAR = %08x, reg = %08x!\n", size == 4 ? 'W' : 'X', opcode & 31, far, ptr);
             far = ptr + rm;
-        }  
+        }
 
         handled = SYSReadValFromAddr(&ctx[opcode & 31], NULL, size, far);
         if (handled) {
@@ -2000,7 +2000,7 @@ int SYSPageFaultReadHandler(uint32_t vector, uint64_t *ctx, uint64_t elr, uint64
         int sext64 = 1;
         if (opcode & (1 << 22))
             sext64 = 0;
-        
+
         uint64_t ptr = ctx[(opcode >> 5) & 31];
         ptr += ((opcode >> 10) & 0xfff) * size;
 
@@ -2048,7 +2048,7 @@ int SYSPageFaultReadHandler(uint32_t vector, uint64_t *ctx, uint64_t elr, uint64
             kprintf("address mismatch in LDURS %c%d. FAR = %08x, reg = %08x!\n", size == 4 ? 'W' : 'X', opcode & 31, far, ptr);
             far = ptr;
         }
-        
+
         handled = SYSReadValFromAddr(&ctx[opcode & 31], NULL, size, far);
         if (handled) {
             int sext = 0;
@@ -2086,7 +2086,7 @@ int SYSPageFaultReadHandler(uint32_t vector, uint64_t *ctx, uint64_t elr, uint64
         {
             ptr += offset;
         }
-        
+
         if (far != ptr)
         {
             kprintf("address mismatch in LDRSW/B/H post-/pre-index. FAR = %08x, reg = %08x!\n", far, ptr);
@@ -2120,7 +2120,7 @@ int SYSPageFaultReadHandler(uint32_t vector, uint64_t *ctx, uint64_t elr, uint64
     }
 
     if (!handled)
-    {    
+    {
         kprintf("[JIT:SYS] Unhandled page fault: opcode %08x, read from %p\n", opcode, far);
     }
 
@@ -2131,7 +2131,7 @@ int SYSPageFaultReadHandler(uint32_t vector, uint64_t *ctx, uint64_t elr, uint64
 }
 
 #undef D
-#define D(x)  x 
+#define D(x)  x
 
 void SYSHandler(uint32_t vector, uint64_t *ctx)
 {
@@ -2163,7 +2163,7 @@ void SYSHandler(uint32_t vector, uint64_t *ctx)
             kprintf("[JIT:SYS] AArch64 RegDump:\n");
             for (int i=0; i < 8; i++)
             {
-                kprintf("[JIT:SYS]   X%02d=%p   X%02d=%p   X%02d=%p   X%02d=%p\n", 
+                kprintf("[JIT:SYS]   X%02d=%p   X%02d=%p   X%02d=%p   X%02d=%p\n",
                     4*i, ctx[4*i],
                     4*i+1, ctx[4*i+1],
                     4*i+2, ctx[4*i+2],
@@ -2202,12 +2202,12 @@ void SYSHandler(uint32_t vector, uint64_t *ctx)
             kprintf("    PC = 0x%08x    SR = ", BE32(ctx[REG_PC]));
 
             kprintf("T%d|", sr >> 14);
-    
+
             if (sr & SR_S)
                 kprintf("S");
             else
                 kprintf(".");
-    
+
             if (sr & SR_M)
                 kprintf("M|");
             else
@@ -2239,7 +2239,7 @@ void SYSHandler(uint32_t vector, uint64_t *ctx)
                 kprintf("C");
             else
                 kprintf(".");
-            
+
             kprintf("\n");
         }
 
@@ -2293,7 +2293,7 @@ void SYSHandler(uint32_t vector, uint64_t *ctx)
         {
             kprintf("[JIT:SYS]  X%02d=%p   X%02d=%p\n", 2*i, ctx[2*i], 2*i+1, ctx[2*i+1]);
         }
-        
+
         while(1) { asm volatile("wfe"); };
     }
 }

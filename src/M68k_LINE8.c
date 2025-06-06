@@ -29,7 +29,6 @@ uint32_t *EMIT_DIVS_ext(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr) __a
 uint32_t *EMIT_PACK_mem(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr) __attribute__((alias("EMIT_PACK_reg")));
 uint32_t *EMIT_PACK_reg(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
 {
-#ifdef __aarch64__
     uint16_t addend = cache_read_16(ICACHE, (uintptr_t)&(*m68k_ptr)[0]);
     uint8_t tmp = -1;
 
@@ -80,11 +79,6 @@ uint32_t *EMIT_PACK_reg(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     ptr = EMIT_AdvancePC(ptr, 4);
 
     RA_FreeARMRegister(&ptr, tmp);
-#else
-    ptr = EMIT_InjectDebugString(ptr, "[JIT] PACK at %08x not implemented\n", *m68k_ptr - 1);
-    ptr = EMIT_InjectPrintContext(ptr);
-    *ptr++ = udf(opcode);
-#endif
 
     return ptr;
 }
@@ -92,7 +86,6 @@ uint32_t *EMIT_PACK_reg(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
 uint32_t *EMIT_UNPK_mem(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr) __attribute__((alias("EMIT_UNPK_reg")));
 uint32_t *EMIT_UNPK_reg(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
 {
-#ifdef __aarch64__
     uint16_t addend = cache_read_16(ICACHE, (uintptr_t)&(*m68k_ptr)[0]);
     uint8_t tmp = -1;
 
@@ -144,11 +137,7 @@ uint32_t *EMIT_UNPK_reg(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     ptr = EMIT_AdvancePC(ptr, 4);
 
     RA_FreeARMRegister(&ptr, tmp);
-#else
-    ptr = EMIT_InjectDebugString(ptr, "[JIT] UNPK at %08x not implemented\n", *m68k_ptr - 1);
-    ptr = EMIT_InjectPrintContext(ptr);
-    *ptr++ = udf(opcode);
-#endif
+
     return ptr;
 }
 
@@ -178,30 +167,14 @@ uint32_t *EMIT_OR_reg(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
         switch (size)
         {
         case 4:
-#ifdef __aarch64__
             *ptr++ = orr_reg(dest, dest, src, LSL, 0);
-#else
-            *ptr++ = orrs_reg(dest, dest, src, 0);
-#endif
             break;
         case 2:
-#ifdef __aarch64__
             *ptr++ = orr_reg(src, src, dest, LSL, 0);
-#else
-            *ptr++ = lsl_immed(src, src, 16);
-            *ptr++ = orrs_reg(src, src, dest, 16);
-            *ptr++ = lsr_immed(src, src, 16);
-#endif
             *ptr++ = bfi(dest, src, 0, 16);
             break;
         case 1:
-#ifdef __aarch64__
             *ptr++ = orr_reg(src, src, dest, LSL, 0);
-#else
-            *ptr++ = lsl_immed(src, src, 24);
-            *ptr++ = orrs_reg(src, src, dest, 24);
-            *ptr++ = lsr_immed(src, src, 24);
-#endif
             *ptr++ = bfi(dest, src, 0, 8);
             break;
         }
@@ -235,11 +208,7 @@ uint32_t *EMIT_OR_reg(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                 *ptr++ = ldr_offset(dest, tmp, 0);
 
             /* Perform calcualtion */
-#ifdef __aarch64__
             *ptr++ = orr_reg(tmp, tmp, src, LSL, 0);
-#else
-            *ptr++ = orrs_reg(tmp, tmp, src, 0);
-#endif
             /* Store back */
             if (mode == 3)
             {
@@ -258,13 +227,7 @@ uint32_t *EMIT_OR_reg(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
             else
                 *ptr++ = ldrh_offset(dest, tmp, 0);
             /* Perform calcualtion */
-#ifdef __aarch64__
             *ptr++ = orr_reg(tmp, tmp, src, LSL, 0);
-#else
-            *ptr++ = lsl_immed(tmp, tmp, 16);
-            *ptr++ = orrs_reg(tmp, tmp, src, 16);
-            *ptr++ = lsr_immed(tmp, tmp, 16);
-#endif
             /* Store back */
             if (mode == 3)
             {
@@ -284,13 +247,7 @@ uint32_t *EMIT_OR_reg(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                 *ptr++ = ldrb_offset(dest, tmp, 0);
 
             /* Perform calcualtion */
-#ifdef __aarch64__
             *ptr++ = orr_reg(tmp, tmp, src, LSL, 0);
-#else
-            *ptr++ = lsl_immed(tmp, tmp, 24);
-            *ptr++ = orrs_reg(tmp, tmp, src, 24);
-            *ptr++ = lsr_immed(tmp, tmp, 24);
-#endif
             /* Store back */
             if (mode == 3)
             {

@@ -21,7 +21,7 @@
 #include "../../include/EmuLogo.h"
 #include "../../include/EmuFeatures.h"
 #include "../../include/RegisterAllocator.h"
-#include "version.h"
+#include "../../include/version.h"
 
 void _start();
 void _boot();

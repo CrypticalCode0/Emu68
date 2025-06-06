@@ -189,8 +189,8 @@ uint32_t *EMIT_CINV(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr) {
         *ptr++ = INSN_TO_LE(0xffffffff);
         *ptr++ = INSN_TO_LE(0xfffffff0);
 
-        return ptr;
 	}
+	return ptr;
 }
 
 uint32_t *EMIT_CPUSH(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr) {

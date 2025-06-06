@@ -15,7 +15,7 @@
 #include "../../include/tlsf.h"
 #include "ps_protocol.h"
 #include "../../include/M68k.h"
-#include "cache.h"
+#include "../../include/cache.h"
 
 //volatile uint8_t gpio_lock;
 //volatile uint32_t gpio_rdval;
@@ -1248,7 +1248,7 @@ uint128_t ps_read_128(unsigned int address) {
 void ps_reset_state_machine() {
 }
 
-#include <boards.h>
+#include "../../include/boards.h"
 extern struct ExpansionBoard **board;
 extern struct ExpansionBoard *__boards_start;
 extern int board_idx;

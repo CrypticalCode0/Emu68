@@ -410,7 +410,7 @@ static inline uint32_t ftosidrz_cc(uint8_t cc, uint8_t s_dst, uint8_t d_src) { r
 static inline uint32_t ftosidrz(uint8_t s_dst, uint8_t d_src) { return ftosidrz_cc(ARM_CC_AL, s_dst, d_src); }
 
 
-#include <RegisterAllocator.h>
+#include "RegisterAllocator.h"
 
 static inline __attribute__((always_inline))
 uint32_t * EMIT_GetFPUFlags(uint32_t * ptr, uint8_t fpsr)

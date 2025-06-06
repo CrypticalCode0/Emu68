@@ -351,7 +351,7 @@ uint32_t *EMIT_FSAVE(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr) {
 	uint8_t sr = GetSR_LineF(opcode) & SR_S;
 	uint8_t ext_count = 0;
 
-	if(cp == cp_FPU && (sr  SR_S)) {
+	if(cp == cp_FPU && (sr & SR_S)) {
   		static int shown = 0;
 		if (!shown) {
 			kprintf("FSAVE\n");

@@ -12,8 +12,9 @@
 
 #include <stdint.h>
 #include <stdarg.h>
-
+#ifdef __aarch64__
 #include "A64.h"
+#endif
 
 #ifdef NULL
 #undef NULL

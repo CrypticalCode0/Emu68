@@ -15,7 +15,7 @@
 #include "../../include/tlsf.h"
 #include "ps_protocol.h"
 #include "../../include/M68k.h"
-#include "cache.h"
+#include "../../include/cache.h"
 
 volatile unsigned int *gpio;
 volatile unsigned int *gpclk;
@@ -753,7 +753,7 @@ void ps_reset_state_machine()
     usleep(100);
 }
 
-#include <boards.h>
+#include "../../include/boards.h"
 extern struct ExpansionBoard **board;
 extern struct ExpansionBoard *__boards_start;
 extern int board_idx;

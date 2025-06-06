@@ -38,7 +38,6 @@ uint32_t *EMIT_ADDQ(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
             {
             case 0:
                 tmp = RA_AllocARMRegister(&ptr);
-#ifdef __aarch64__
                 if (update_mask == 0 || update_mask == SR_Z || update_mask == SR_N) {
                     *ptr++ = add_immed(tmp, dest, data);
                     *ptr++ = bfxil(dest, tmp, 0, 8);
@@ -56,18 +55,11 @@ uint32_t *EMIT_ADDQ(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                     *ptr++ = adds_reg(tmp, tmp, dest, LSL, 24);
                     *ptr++ = bfxil(dest, tmp, 24, 8);
                 }
-#else
-                *ptr++ = lsl_immed(tmp, dest, 24);
-                *ptr++ = adds_immed(tmp, tmp, 0x400 | data);
-                *ptr++ = lsr_immed(tmp, tmp, 24);
-                *ptr++ = bfi(dest, tmp, 0, 8);
-#endif
                 RA_FreeARMRegister(&ptr, tmp);
                 break;
 
             case 1:
                 tmp = RA_AllocARMRegister(&ptr);
-#ifdef __aarch64__
                 if (update_mask == 0 || update_mask == SR_Z || update_mask == SR_N) {
                     *ptr++ = add_immed(tmp, dest, data);
                     *ptr++ = bfxil(dest, tmp, 0, 16);
@@ -85,12 +77,6 @@ uint32_t *EMIT_ADDQ(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                     *ptr++ = adds_reg(tmp, tmp, dest, LSL, 16);
                     *ptr++ = bfxil(dest, tmp, 16, 16);
                 }
-#else
-                *ptr++ = lsl_immed(tmp, dest, 16);
-                *ptr++ = adds_immed(tmp, tmp, 0x800 | data);
-                *ptr++ = lsr_immed(tmp, tmp, 16);
-                *ptr++ = bfi(dest, tmp, 0, 16);
-#endif
                 RA_FreeARMRegister(&ptr, tmp);
                 break;
 
@@ -133,7 +119,6 @@ uint32_t *EMIT_ADDQ(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                 else
                     *ptr++ = ldrb_offset(dest, tmp, 0);
                 /* Perform calcualtion */
-#ifdef __aarch64__
                 if (update_mask == 0 || update_mask == SR_Z || update_mask == SR_N) {
                     *ptr++ = add_immed(tmp, tmp, data);
 
@@ -152,11 +137,6 @@ uint32_t *EMIT_ADDQ(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                     *ptr++ = lsr(tmp, tmp, 24);
                     RA_FreeARMRegister(&ptr, immed);
                 }
-#else
-                *ptr++ = lsl_immed(tmp, tmp, 24);
-                *ptr++ = adds_immed(tmp, tmp, 0x400 | data);
-                *ptr++ = lsr_immed(tmp, tmp, 24);
-#endif
                 /* Store back */
                 if (mode == 3)
                 {
@@ -176,7 +156,6 @@ uint32_t *EMIT_ADDQ(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                     *ptr++ = ldrh_offset(dest, tmp, 0);
 
                 /* Perform calcualtion */
-#ifdef __aarch64__
                 if (update_mask == 0 || update_mask == SR_Z || update_mask == SR_N) {
                     *ptr++ = add_immed(tmp, tmp, data);
 
@@ -195,11 +174,6 @@ uint32_t *EMIT_ADDQ(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                     *ptr++ = lsr(tmp, tmp, 16);
                     RA_FreeARMRegister(&ptr, immed);
                 }
-#else
-                *ptr++ = lsl_immed(tmp, tmp, 16);
-                *ptr++ = adds_immed(tmp, tmp, 0x800 | data);
-                *ptr++ = lsr_immed(tmp, tmp, 16);
-#endif
                 /* Store back */
                 if (mode == 3)
                 {
@@ -317,7 +291,6 @@ uint32_t *EMIT_SUBQ(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
             {
             case 0:
                 tmp = RA_AllocARMRegister(&ptr);
-#ifdef __aarch64__
                 if (update_mask == 0 || update_mask == SR_Z || update_mask == SR_N) {
                     *ptr++ = sub_immed(tmp, dest, data);
                     *ptr++ = bfxil(dest, tmp, 0, 8);
@@ -336,18 +309,11 @@ uint32_t *EMIT_SUBQ(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                     *ptr++ = subs_reg(tmp, tmp2, tmp, LSL, 0);
                     *ptr++ = bfxil(dest, tmp, 24, 8);
                 }
-#else
-                *ptr++ = lsl_immed(tmp, dest, 24);
-                *ptr++ = subs_immed(tmp, tmp, 0x400 | data);
-                *ptr++ = lsr_immed(tmp, tmp, 24);
-                *ptr++ = bfi(dest, tmp, 0, 8);
-#endif
                 RA_FreeARMRegister(&ptr, tmp);
                 break;
 
             case 1:
                 tmp = RA_AllocARMRegister(&ptr);
-#ifdef __aarch64__
                 if (update_mask == 0 || update_mask == SR_Z || update_mask == SR_N) {
                     *ptr++ = sub_immed(tmp, dest, data);
                     *ptr++ = bfxil(dest, tmp, 0, 16);
@@ -366,12 +332,6 @@ uint32_t *EMIT_SUBQ(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                     *ptr++ = subs_reg(tmp, tmp2, tmp, LSL, 0);
                     *ptr++ = bfxil(dest, tmp, 16, 16);
                 }
-#else
-                *ptr++ = lsl_immed(tmp, dest, 16);
-                *ptr++ = subs_immed(tmp, tmp, 0x800 | data);
-                *ptr++ = lsr_immed(tmp, tmp, 16);
-                *ptr++ = bfi(dest, tmp, 0, 16);
-#endif
                 RA_FreeARMRegister(&ptr, tmp);
                 break;
 
@@ -416,7 +376,6 @@ uint32_t *EMIT_SUBQ(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
             else
                 *ptr++ = ldrb_offset(dest, tmp, 0);
             /* Perform calcualtion */
-#ifdef __aarch64__
             if (update_mask == 0 || update_mask == SR_Z || update_mask == SR_N) {
                 *ptr++ = sub_immed(tmp, tmp, data);
 
@@ -436,11 +395,6 @@ uint32_t *EMIT_SUBQ(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                 *ptr++ = lsr(tmp, tmp, 24);
                 RA_FreeARMRegister(&ptr, immed);
             }
-#else
-            *ptr++ = lsl_immed(tmp, tmp, 24);
-            *ptr++ = subs_immed(tmp, tmp, 0x400 | data);
-            *ptr++ = lsr_immed(tmp, tmp, 24);
-#endif
             /* Store back */
             if (mode == 3)
             {
@@ -460,7 +414,6 @@ uint32_t *EMIT_SUBQ(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                 *ptr++ = ldrh_offset(dest, tmp, 0);
 
             /* Perform calcualtion */
-#ifdef __aarch64__
             if (update_mask == 0 || update_mask == SR_Z || update_mask == SR_N) {
                 *ptr++ = sub_immed(tmp, tmp, data);
 
@@ -480,11 +433,6 @@ uint32_t *EMIT_SUBQ(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                 *ptr++ = lsr(tmp, tmp, 16);
                 RA_FreeARMRegister(&ptr, immed);
             }
-#else
-            *ptr++ = lsl_immed(tmp, tmp, 16);
-            *ptr++ = subs_immed(tmp, tmp, 0x800 | data);
-            *ptr++ = lsr_immed(tmp, tmp, 16);
-#endif
             /* Store back */
             if (mode == 3)
             {
@@ -589,25 +537,15 @@ uint32_t *EMIT_Scc(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
         /* T condition always sets lowest 8 bis, F condition always clears them */
         if ((opcode & 0x0f00) == 0x0100)
         {
-#ifdef __aarch64__
             *ptr++ = bic_immed(dest, dest, 8, 0);
-#else
-            *ptr++ = bfc(dest, 0, 8);
-#endif
         }
         else if ((opcode & 0x0f00) == 0x0000)
         {
-#ifdef __aarch64__
             *ptr++ = orr_immed(dest, dest, 8, 0);
-#else
-            *ptr++ = orr_immed(dest, dest, 0xff);
-#endif
         }
         else
         {
             arm_condition = EMIT_TestCondition(&ptr, m68k_condition);
-
-#ifdef __aarch64__
 
 /*
             uint8_t c_yes = RA_AllocARMRegister(&ptr);
@@ -626,10 +564,6 @@ uint32_t *EMIT_Scc(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
             *ptr++ = bfi(dest, tmp, 0, 8);
 
             RA_FreeARMRegister(&ptr, tmp);
-#else
-            *ptr++ = orr_cc_immed(arm_condition, dest, dest, 0xff);
-            *ptr++ = bfc_cc(arm_condition^1, dest, 0, 8);
-#endif
         }
     }
     else
@@ -640,19 +574,11 @@ uint32_t *EMIT_Scc(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
         /* T condition always sets lowest 8 bis, F condition always clears them */
         if ((opcode & 0x0f00) == 0x0100)
         {
-#ifdef __aarch64__
             *ptr++ = mov_immed_u16(dest, 0, 0);
-#else
-            *ptr++ = bfc(tmp, 0, 8);
-#endif
         }
         else if ((opcode & 0x0f00) == 0x0000)
         {
-#ifdef __aarch64__
             *ptr++ = mov_immed_u16(dest, 0xff, 0);
-#else
-            *ptr++ = orr_immed(tmp, tmp, 0xff);
-#endif
         }
         else
         {
@@ -823,51 +749,25 @@ uint32_t *EMIT_DBcc(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
 
         /* Copy register to temporary, shift 16 bits left */
         uint8_t reg = RA_AllocARMRegister(&ptr);
-#ifdef __aarch64__
         *ptr++ = uxth(reg, counter_reg);
-#else
-        *ptr++ = mov_reg_shift(reg, counter_reg, 16);
-#endif
         /* Substract 0x10000 from temporary, compare with 0xffff0000 */
-#ifdef __aarch64__
         *ptr++ = subs_immed(reg, reg, 1);
-#else
-        *ptr++ = sub_immed(reg, reg, 0x801);
-        *ptr++ = cmn_immed(reg, 0x801);
-
-        /* Bit shift result back and copy it into counter register */
-        *ptr++ = lsr_immed(reg, reg, 16);
-#endif
         *ptr++ = bfi(counter_reg, reg, 0, 16);
         RA_SetDirtyM68kRegister(&ptr, opcode & 7);
 
         /* If counter was 0xffff (temprary reg 0xffff0000) break the loop */
-#ifdef __aarch64__
         *ptr++ = csel(REG_PC, c_true, c_false, A64_CC_MI);
         branch_2 = ptr;
         *ptr++ = b_cc(A64_CC_PL, 3);
         if (branch_1) {
-#ifdef __aarch64__
             *branch_1 = b_cc(arm_condition, ptr - branch_1);
-#else
-            *branch_1 = INSN_TO_LE(INSN_TO_LE(*branch_1) + ((int)(branch_2 - branch_1) << 5));
-#endif
         }
-#else
-        *ptr++ = add_cc_immed(ARM_CC_EQ, REG_PC, REG_PC, 4);
-        branch_2 = ptr;
-        *ptr++ = b_cc(ARM_CC_EQ, 2);
-#endif
 
 #if 0
         *ptr++ = add_immed(REG_PC, REG_PC, 2);
         /* Load PC-relative offset */
         *ptr++ = ldrsh_offset(REG_PC, reg, 0);
-#ifdef __aarch64__
         *ptr++ = add_reg(REG_PC, REG_PC, reg, LSL, 0);
-#else
-        *ptr++ = add_reg(REG_PC, REG_PC, reg, 0);
-#endif
 #endif
         RA_FreeARMRegister(&ptr, reg);
 

@@ -10,24 +10,24 @@
 #include <stdarg.h>
 #include <stdint.h>
 #include "libdeflate.h"
-#include "A64.h"
-#include "config.h"
-#include "support.h"
-#include "mmu.h"
-#include "tlsf.h"
-#include "devicetree.h"
-#include "M68k.h"
-#include "HunkLoader.h"
-#include "ElfLoader.h"
-#include "DuffCopy.h"
-#include "EmuLogo.h"
-#include "EmuFeatures.h"
-#include "RegisterAllocator.h"
-#include "md5.h"
-#include "disasm.h"
-#include "version.h"
-#include "cache.h"
-#include "sponsoring.h"
+#include "../../include/A64.h"
+#include "../../include/config.h"
+#include "../../include/support.h"
+#include "../../include/mmu.h"
+#include "../../include/tlsf.h"
+#include "../../include/devicetree.h"
+#include "../../include/M68k.h"
+#include "../../include/HunkLoader.h"
+#include "../../include/ElfLoader.h"
+#include "../../include/DuffCopy.h"
+#include "../../include/EmuLogo.h"
+#include "../../include/EmuFeatures.h"
+#include "../../include/RegisterAllocator.h"
+#include "../../include/md5.h"
+#include "../../include/disasm.h"
+#include "../../include/version.h.in"
+#include "../../include/cache.h"
+#include "../../include/sponsoring.h"
 
 void _start();
 void _boot();
@@ -405,9 +405,9 @@ void secondary_boot(void)
     int async_log = 0;
 
     asm volatile("mrs %0, MPIDR_EL1":"=r"(cpu_id));
-   
+
     cpu_id &= 3;
-    
+
     /* Enable caches and cache maintenance instructions from EL0 */
     asm volatile("mrs %0, SCTLR_EL1":"=r"(tmp));
     tmp |= (1 << 2) | (1 << 12);    // Enable D and I caches
@@ -426,7 +426,7 @@ void secondary_boot(void)
     asm volatile("msr PMCNTENSET_EL0, %0; isb"::"r"(tmp));
 
     kprintf("[BOOT] Started CPU%d\n", cpu_id);
-    
+
     if (cpu_id == 1)
     {
         e = dt_find_node("/chosen");
@@ -496,7 +496,7 @@ int amiga_checksum(uint8_t *mem, uintptr_t size, uintptr_t chkoff, int update)
 
     if (update && cksum != oldcksum) {
         kprintf("Updating checksum from 0x%08x to 0x%08x\n", oldcksum, cksum);
-        
+
         mem[chkoff + 0] = (cksum >> 24) & 0xff;
         mem[chkoff + 1] = (cksum >> 16) & 0xff;
         mem[chkoff + 2] = (cksum >>  8) & 0xff;
@@ -531,7 +531,7 @@ void boot(void *dtree)
     of_property_t *p = NULL;
     of_node_t *e = NULL;
     void *initramfs_loc = NULL;
-    uintptr_t initramfs_size = 0;    
+    uintptr_t initramfs_size = 0;
     boot_lock = 0;
 
 #ifdef PISTORM
@@ -611,7 +611,7 @@ void boot(void *dtree)
                 if (cs > 8) {
                     cs = 8;
                 }
-                
+
                 cs_dist = cs;
             }
 
@@ -632,7 +632,7 @@ void boot(void *dtree)
                 if (cs > 8) {
                     cs = 8;
                 }
-                
+
                 cs_dist = cs;
             }
 
@@ -737,7 +737,7 @@ void boot(void *dtree)
                 if (bup > 2048) {
                     bup = 2048;
                 }
-                
+
                 buptest = bup;
             }
             if ((tok = find_token(prop->op_value, "bupiter=")))
@@ -755,7 +755,7 @@ void boot(void *dtree)
                 if (iter > 9) {
                     iter = 9;
                 }
-                
+
                 bupiter = iter;
             }
             if ((tok = find_token(prop->op_value, "vc4.mem=")))
@@ -777,7 +777,7 @@ void boot(void *dtree)
             if ((tok = find_token(prop->op_value, "checksum_rom")))
             {
                 recalc_checksum = 1;
-            } 
+            }
             if ((tok = find_token(prop->op_value, "copy_rom=")))
             {
                 tok += 9;
@@ -820,7 +820,7 @@ void boot(void *dtree)
     dt_add_node(NULL, e);
 
     /*
-        At this place we have local memory manager but no MMU set up yet. 
+        At this place we have local memory manager but no MMU set up yet.
         Nevertheless, attempt to copy initrd image to safe location since it is not guarded in RAM
     */
     e = dt_find_node("/chosen");
@@ -854,7 +854,7 @@ void boot(void *dtree)
     if (initramfs_size != 0 && ((uint8_t *)initramfs_loc)[0] == 0x1f && ((uint8_t *)initramfs_loc)[1] == 0x8b)
     {
         struct libdeflate_decompressor *decomp = libdeflate_alloc_decompressor();
-        
+
         if (decomp != NULL)
         {
             void *out_buffer = tlsf_malloc(tlsf, 8*1024*1024);
@@ -885,9 +885,9 @@ void boot(void *dtree)
     {
 #ifdef PISTORM32LITE
         #include "../pistorm/efinix_firmware.h"
-        
+
         struct libdeflate_decompressor *decomp = libdeflate_alloc_decompressor();
-        
+
         if (decomp != NULL)
         {
             void *out_buffer = tlsf_malloc(tlsf, 8*1024*1024);
@@ -958,15 +958,15 @@ void boot(void *dtree)
                 block_top = block;
                 top_of_ram = sys_memory[block].mb_Base + sys_memory[block].mb_Size;
             }
-            
+
             range += block_size / 4;
         }
 
         if (vid_base)
         {
-            kprintf("[BOOT] VC4 framebuffer memory: %p-%p (%d MiB)\n", 
+            kprintf("[BOOT] VC4 framebuffer memory: %p-%p (%d MiB)\n",
                 vid_base,
-                vid_base + (vid_memory << 20) - 1, 
+                vid_base + (vid_memory << 20) - 1,
                 vid_memory);
         }
 
@@ -986,14 +986,14 @@ void boot(void *dtree)
                 range[address_cells + size_cells - 1 - i] = BE32(size);
                 size >>= 32;
             }
-            
+
             range += block_size / 4;
-            
-            kprintf("[BOOT] System memory: %p-%p (%d MiB)\n", 
+
+            kprintf("[BOOT] System memory: %p-%p (%d MiB)\n",
                     sys_memory[block].mb_Base,
-                    sys_memory[block].mb_Base + sys_memory[block].mb_Size - 1, 
+                    sys_memory[block].mb_Base + sys_memory[block].mb_Size - 1,
                     sys_memory[block].mb_Size >> 20);
-            
+
             if (sys_memory[block].mb_Base < 0xf2000000)
             {
                 uint64_t size = sys_memory[block].mb_Size;
@@ -1095,7 +1095,7 @@ void boot(void *dtree)
     temp_stack = (uintptr_t)tlsf_malloc(tlsf, 65536) + 65536;
     *(uint64_t *)0xffffff90000000e0 = LE64(mmu_virt2phys((intptr_t)_secondary_start));
     clear_entire_dcache();
-        
+
     kprintf("[BOOT] Boot address set to %p, stack at %p\n", LE64(*(uint64_t*)0xffffff90000000e0), temp_stack);
 
     asm volatile("sev");
@@ -1106,7 +1106,7 @@ void boot(void *dtree)
     temp_stack = (uintptr_t)tlsf_malloc(tlsf, 65536) + 65536;
     *(uint64_t *)0xffffff90000000e8 = LE64(mmu_virt2phys((intptr_t)_secondary_start));
     clear_entire_dcache();
-        
+
     kprintf("[BOOT] Boot address set to %p, stack at %p\n", LE64(*(uint64_t*)0xffffff90000000e8), temp_stack);
 
     asm volatile("sev");
@@ -1117,7 +1117,7 @@ void boot(void *dtree)
     temp_stack = (uintptr_t)tlsf_malloc(tlsf, 65536) + 65536;
     *(uint64_t *)0xffffff90000000f0 = LE64(mmu_virt2phys((intptr_t)_secondary_start));
     clear_entire_dcache();
-        
+
     kprintf("[BOOT] Boot address set to %p, stack at %p\n", LE64(*(uint64_t*)0xffffff90000000f0), temp_stack);
 
     asm volatile("sev");
@@ -1138,13 +1138,13 @@ void boot(void *dtree)
     kprintf("[BOOT] PMCR=%08x\n", tmp);
     tmp = 0x80000000; // Enable cycle counter
     asm volatile("msr PMCNTENSET_EL0, %0; isb"::"r"(tmp));
-   
+
 
     if (debug_cnt)
     {
         uint64_t tmp;
         kprintf("[BOOT] Performance counting requested\n");
-        
+
         asm volatile("mrs %0, PMCR_EL0":"=r"(tmp));
         kprintf("[BOOT] Number of counters implemented: %d\n", (tmp >> 11) & 31);
 
@@ -1310,7 +1310,7 @@ void boot(void *dtree)
         }
         mmu_map(0xf80000, 0xf80000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR_CACHED, 0);
 
-        /* For larger ROMs copy also 512K from 0xe00000 (1M) and 0xa80000, 0xb00000 (2M) */ 
+        /* For larger ROMs copy also 512K from 0xe00000 (1M) and 0xa80000, 0xb00000 (2M) */
         if (rom_copy == 1024)
         {
             for (int i=0; i < 524288; i+=4)
@@ -1351,7 +1351,7 @@ void boot(void *dtree)
 
         kprintf("[BOOT] Loading ROM from %p, size %d\n", initramfs_loc, initramfs_size);
         mmu_map(0xf80000, 0xf80000, 524288, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR_CACHED, 0);
-            
+
         if (initramfs_size == 262144)
         {
             /* Make a shadow of 0xf80000 at 0xe00000 */
@@ -1411,7 +1411,7 @@ void boot(void *dtree)
                             uint8_t tmp = rom_start[i];
                             rom_start[i] = rom_start[i + 1];
                             rom_start[i+1] = tmp;
-                        }   
+                        }
                     }
                 }
             }
@@ -1460,7 +1460,7 @@ void boot(void *dtree)
 
     kprintf("[BOOT] Setting IRQ routing to core 0\n");
     wr32le(0xf300000c, 0);
-    
+
     kprintf("[BOOT] Enabling PMU and Timer interrupts on core 0\n");
     wr32le(0xf3000010, 1);      // Enable PMU IRQ on core 0
     wr32le(0xf3000014, 0xfe);   // Disable PMU IRQ on all otehr cores
@@ -1547,11 +1547,11 @@ void M68K_SaveContext(struct M68KState *ctx)
 {
     asm volatile("mov w1, v31.s[0]; str w1, %0"::"m"(ctx->CACR):"x1");
     asm volatile("mov x1, v30.d[0]; str x1, %0"::"m"(ctx->INSN_COUNT):"x1");
-    
+
     asm volatile("mov w1, v29.s[0]; str w1, %0"::"m"(ctx->FPSR):"x1");
     asm volatile("mov w1, v29.s[1]; str w1, %0"::"m"(ctx->FPIAR):"x1");
     asm volatile("umov w1, v29.h[4]; strh w1, %0"::"m"(ctx->FPCR):"x1");
-    
+
     asm volatile("stp w%0, w%1, %2"::"i"(REG_D0),"i"(REG_D1),"m"(ctx->D[0].u32));
     asm volatile("stp w%0, w%1, %2"::"i"(REG_D2),"i"(REG_D3),"m"(ctx->D[2].u32));
     asm volatile("stp w%0, w%1, %2"::"i"(REG_D4),"i"(REG_D5),"m"(ctx->D[4].u32));
@@ -1583,7 +1583,7 @@ void M68K_SaveContext(struct M68KState *ctx)
     }
     else
         asm volatile("mov v31.S[1], w%0"::"i"(REG_A7));
-    
+
     asm volatile("mov w1, v31.s[1]; str w1, %0"::"m"(ctx->USP):"x1");
     asm volatile("mov w1, v31.s[2]; str w1, %0"::"m"(ctx->ISP):"x1");
     asm volatile("mov w1, v31.s[3]; str w1, %0"::"m"(ctx->MSP):"x1");
@@ -1609,19 +1609,19 @@ void M68K_PrintContext(struct M68KState *m68k)
 
     kprintf("    PC = 0x%08x    SR = ", BE32((int)m68k->PC));
     uint16_t sr = BE16(m68k->SR);
-    
+
     kprintf("T%d|", sr >> 14);
-    
+
     if (sr & SR_S)
         kprintf("S");
     else
         kprintf(".");
-    
+
     if (sr & SR_M)
         kprintf("M|");
     else
         kprintf(".|");
-    
+
     kprintf("IPM%d|", (sr >> 8) & 7);
 
     if (sr & SR_X)
@@ -1940,8 +1940,8 @@ void  __attribute__((used)) stub_ExecutionLoop()
 #endif
 
 // We have w10 with ARM IPL here and w1 with m68k IPL, select higher, in case of ARM clear pending bit
-"998:   cmp     w1, w10                     \n" 
-"       csel    w1, w1, w10, hi             \n" // if W1 was higher, select it 
+"998:   cmp     w1, w10                     \n"
+"       csel    w1, w1, w10, hi             \n" // if W1 was higher, select it
 "       csel    w10, wzr, w10, hi           \n" // In that case clear w10
 "999:                                       \n"
 "       mrs     x2, TPIDR_EL0               \n" // Get SR
@@ -1975,7 +1975,7 @@ void  __attribute__((used)) stub_ExecutionLoop()
 "       bfxil   w2, w3, 30, 2               \n" // Put reversed C and V into old SR (to be pushed on stack)
 "       bfi     w5, w1, %[srb_ipm], 3       \n" // Insert IPL level to SR register IPM field
 "       lsl     w3, w1, #2                  \n" // Calculate vector offset
-"       add     w3, w3, #0x60               \n" 
+"       add     w3, w3, #0x60               \n"
 "       strh    w2, [x%[reg_sp], #-8]!      \n" // Push old SR
 "       str     w%[reg_pc], [x%[reg_sp], #2]\n" // Push address of next instruction
 "       strh    w3, [x%[reg_sp], #6]        \n" // Push frame format 0
@@ -2043,7 +2043,7 @@ void  __attribute__((used)) stub_ExecutionLoop()
  [fcount]"i"(__builtin_offsetof(struct M68KTranslationUnit, mt_FetchCount)),
  [cacr]"i"(__builtin_offsetof(struct M68KState, CACR)),
  [offset]"i"(__builtin_offsetof(struct M68KTranslationUnit, mt_ARMEntryPoint)),
- [diff]"i"(__builtin_offsetof(struct M68KTranslationUnit, mt_ARMCode) - 
+ [diff]"i"(__builtin_offsetof(struct M68KTranslationUnit, mt_ARMCode) -
         __builtin_offsetof(struct M68KTranslationUnit, mt_UseCount)),
  [intreq]"i"(__builtin_offsetof(struct M68KState, INT)),
  [arm]"i"(__builtin_offsetof(struct M68KState, INT.ARM)),
@@ -2087,7 +2087,7 @@ void M68K_StartEmu(void *addr, void *fdt)
 
 #ifdef PISTORM
     (void)fdt;
-    
+
     asm volatile("mov %0, #0":"=r"(addr));
 
     __m68k.ISP.u32 = BE32(*((uint32_t*)addr));
@@ -2104,7 +2104,7 @@ void M68K_StartEmu(void *addr, void *fdt)
     __m68k.JIT_CONTROL |= (EMU68_MAX_LOOP_COUNT & JCCB_LOOP_COUNT_MASK) << JCCB_LOOP_COUNT;
     __m68k.JIT_CONTROL2 = chip_slowdown ? JC2F_CHIP_SLOWDOWN : 0;
     __m68k.JIT_CONTROL2 |= dbf_slowdown ? JC2F_DBF_SLOWDOWN : 0;
-    __m68k.JIT_CONTROL2 |= (emu68_ccrd  << JC2B_CCR_SCAN_DEPTH); 
+    __m68k.JIT_CONTROL2 |= (emu68_ccrd  << JC2B_CCR_SCAN_DEPTH);
     __m68k.JIT_CONTROL2 |= ((cs_dist - 1) << JC2B_CHIP_SLOWDOWN_RATIO);
     __m68k.JIT_CONTROL2 |= blitwait ? JC2F_BLITWAIT : 0;
 
@@ -2172,7 +2172,7 @@ void M68K_StartEmu(void *addr, void *fdt)
             if (strstr(prop->op_value, "move_slow_to_chip"))
                 move_slow_to_chip = 1;
 #endif
-        }       
+        }
     }
 
     kprintf("[JIT]\n");
@@ -2268,4 +2268,3 @@ asm volatile(
     }
         //kprintf("[BOOT] reg 0xf3000034 = %08x\n", LE32(*(volatile uint32_t *)0xf3000034));
 }
-

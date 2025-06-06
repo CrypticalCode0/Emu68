@@ -1,9 +1,9 @@
-#include "config.h"
-#include "tlsf.h"
-#include "support.h"
-#include "cache.h"
+#include "../include/config.h"
+#include "../include/tlsf.h"
+#include "../include/support.h"
+#include "../include/cache.h"
 //#include "ps_protocol.h"
-#include "M68k.h"
+#include "../include/M68k.h"
 #include <stdint.h>
 
 union CacheLine
@@ -92,7 +92,7 @@ void cache_invalidate_all(enum CacheType type)
         for (int j=0; j < CACHE_WAY_COUNT; j++)
         {
             cache->c_Flags[i][j] = 0;
-        }        
+        }
     }
 }
 
@@ -115,7 +115,7 @@ void cache_flush_all(enum CacheType type)
                 uint32_t line_address = cache->c_Tags[set][way] + (set << 4);
                 D(kprintf("[CACHE]   cache line was previously used, tag=%08x, address=%08x, flushing\n",
                     cache->c_Tags[set][way], line_address));
-                
+
                 /* Write cache back if the lines are dirty */
                 if (cache->c_Flags[set][way] & F_DIRTY0)
                     *(uint32_t *)(uintptr_t)(line_address) = cache->c_Lines[set][way].cl_32[0];
@@ -127,7 +127,7 @@ void cache_flush_all(enum CacheType type)
                     *(uint32_t *)(uintptr_t)(line_address + 12) = cache->c_Lines[set][way].cl_32[3];
             }
             cache->c_Flags[set][way] = 0;
-        }        
+        }
     }
 }
 
@@ -210,7 +210,7 @@ uint128_t cache_read_128(enum CacheType type, uint32_t address)
 #if 0
 
     if (type == DCACHE) return 0;
-    
+
     /* Exit if given cache is disabled in CACR */
     uint32_t cacr;
     asm volatile("mov %w0, v31.s[0]":"=r"(cacr));
@@ -261,7 +261,7 @@ uint128_t cache_read_128(enum CacheType type, uint32_t address)
             uint32_t line_address = cache->c_Tags[set][way] + (set << 4);
             D(kprintf("[CACHE]   cache line was previously used, tag=%08x, address=%08x, flushing\n",
         	    cache->c_Tags[set][way], line_address));
-            
+
             /* Write cache back if the lines are dirty */
             if (cache->c_Flags[set][way] & F_DIRTY0)
                 *(uint32_t*)(uintptr_t)line_address = cache->c_Lines[set][way].cl_32[0];
@@ -332,7 +332,7 @@ uint64_t cache_read_64(enum CacheType type, uint32_t address)
                 data = cache_read_64(type, address - 1) << 8;
                 data |= cache_read_8(type, address + 7);
                 break;
-            
+
             case 10:
                 data = cache_read_64(type, address - 2) << 16;
                 data |= cache_read_16(type, address + 6);
@@ -347,7 +347,7 @@ uint64_t cache_read_64(enum CacheType type, uint32_t address)
                 data = (uint64_t)cache_read_32(type, address) << 32;
                 data |= cache_read_32(type, address + 4);
                 break;
-            
+
             case 13:
                 data = (uint64_t)cache_read_16(type, address) << 40;
                 data |= cache_read_64(type, address + 3) >> 24;
@@ -392,7 +392,7 @@ uint64_t cache_read_64(enum CacheType type, uint32_t address)
             uint32_t line_address = cache->c_Tags[set][way] + (set << 4);
             D(kprintf("[CACHE]   cache line was previously used, tag=%08x, address=%08x, flushing\n",
         	    cache->c_Tags[set * CACHE_WAY_COUNT + way], line_address));
-            
+
             /* Write cache back if the lines are dirty */
             if (cache->c_Flags[set][way] & F_DIRTY0)
                 *(uint32_t*)(uintptr_t)line_address = cache->c_Lines[set][way].cl_32[0];
@@ -474,7 +474,7 @@ uint32_t cache_read_32(enum CacheType type, uint32_t address)
             default:
                 break;
         }
-        
+
         return data;
     }
 
@@ -501,7 +501,7 @@ uint32_t cache_read_32(enum CacheType type, uint32_t address)
             uint32_t line_address = cache->c_Tags[set][way] + (set << 4);
             D(kprintf("[CACHE]   cache line was previously used, tag=%08x, address=%08x, flushing\n",
         	    cache->c_Tags[set][way], line_address));
-            
+
             /* Write cache back if the lines are dirty */
             if (cache->c_Flags[set][way] & F_DIRTY0)
                 *(uint32_t*)(uintptr_t)line_address = cache->c_Lines[set][way].cl_32[0];
@@ -567,7 +567,7 @@ uint16_t cache_read_16(enum CacheType type, uint32_t address)
     {
         uint16_t data = cache_read_8(type, address) << 8;
         data |= cache_read_8(type, address + 1);
-        
+
         return data;
     }
 
@@ -594,7 +594,7 @@ uint16_t cache_read_16(enum CacheType type, uint32_t address)
             uint32_t line_address = cache->c_Tags[set][way] + (set << 4);
             D(kprintf("[CACHE]   cache line was previously used, tag=%08x, address=%08x, flushing\n",
         	    cache->c_Tags[set][way], line_address));
-            
+
             /* Write cache back if the lines are dirty */
             if (cache->c_Flags[set][way] & F_DIRTY0)
                 *(uint32_t*)(uintptr_t)line_address = cache->c_Lines[set][way].cl_32[0];
@@ -679,7 +679,7 @@ uint8_t cache_read_8(enum CacheType type, uint32_t address)
             uint32_t line_address = cache->c_Tags[set][way] + (set << 4);
             D(kprintf("[CACHE]   cache line was previously used, tag=%08x, address=%08x, flushing\n",
         	    cache->c_Tags[set][way], line_address));
-            
+
             /* Write cache back if the lines are dirty */
             if (cache->c_Flags[set][way] & F_DIRTY0)
                 *(uint32_t*)(uintptr_t)line_address = cache->c_Lines[set][way].cl_32[0];
@@ -772,7 +772,7 @@ int cache_write_128(enum CacheType type, uint32_t address, uint128_t data, uint8
             uint32_t line_address = cache->c_Tags[set][way] + (set << 4);
             D(kprintf("[CACHE]   cache line was previously used, tag=%08x, address=%08x, flushing\n",
         	    cache->c_Tags[set][way], line_address));
-            
+
             /* Write cache back if the lines are dirty */
             if (cache->c_Flags[set][way] & F_DIRTY0)
                 *(uint32_t*)(uintptr_t)line_address = cache->c_Lines[set][way].cl_32[0];
@@ -872,7 +872,7 @@ int cache_write_64(enum CacheType type, uint32_t address, uint64_t data, uint8_t
             uint32_t line_address = cache->c_Tags[set][way] + (set << 4);
             D(kprintf("[CACHE]   cache line was previously used, tag=%08x, address=%08x, flushing\n",
         	    cache->c_Tags[set][way], line_address));
-            
+
             /* Write cache back if the lines are dirty */
             if (cache->c_Flags[set][way] & F_DIRTY0)
                 *(uint32_t*)(uintptr_t)line_address = cache->c_Lines[set][way].cl_32[0];
@@ -989,7 +989,7 @@ int cache_write_32(enum CacheType type, uint32_t address, uint32_t data, uint8_t
             uint32_t line_address = cache->c_Tags[set][way] + (set << 4);
             D(kprintf("[CACHE]   cache line was previously used, tag=%08x, address=%08x, flushing\n",
         	    cache->c_Tags[set][way], line_address));
-            
+
             /* Write cache back if the lines are dirty */
             if (cache->c_Flags[set][way] & F_DIRTY0)
                 *(uint32_t*)(uintptr_t)line_address = cache->c_Lines[set][way].cl_32[0];
@@ -1112,7 +1112,7 @@ int cache_write_16(enum CacheType type, uint32_t address, uint16_t data, uint8_t
             uint32_t line_address = cache->c_Tags[set][way] + (set << 4);
             D(kprintf("[CACHE]   cache line was previously used, tag=%08x, address=%08x, flushing\n",
         	    cache->c_Tags[set][way], line_address));
-            
+
             /* Write cache back if the lines are dirty */
             if (cache->c_Flags[set][way] & F_DIRTY0)
                 *(uint32_t*)(uintptr_t)line_address = cache->c_Lines[set][way].cl_32[0];
@@ -1228,7 +1228,7 @@ int cache_write_8(enum CacheType type, uint32_t address, uint8_t data, uint8_t w
             uint32_t line_address = cache->c_Tags[set][way] + (set << 4);
             D(kprintf("[CACHE]   cache line was previously used, tag=%08x, address=%08x, flushing\n",
         	    cache->c_Tags[set][way], line_address));
-            
+
             /* Write cache back if the lines are dirty */
             if (cache->c_Flags[set][way] & F_DIRTY0)
                 *(uint32_t*)(uintptr_t)line_address = cache->c_Lines[set][way].cl_32[0];
@@ -1281,4 +1281,3 @@ int cache_write_8(enum CacheType type, uint32_t address, uint8_t data, uint8_t w
 
     return 1;
 }
-
