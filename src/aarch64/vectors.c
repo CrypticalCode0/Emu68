@@ -321,6 +321,7 @@ enum
 };
 
 int block_c0;
+extern int zorro_disable;
 
 int SYSWriteValToAddr(uint64_t value, uint64_t value2, int size, uint64_t far)
 {
@@ -380,6 +381,16 @@ int SYSWriteValToAddr(uint64_t value, uint64_t value2, int size, uint64_t far)
         if ((value & 1) != overlay) {
             kprintf("[JIT:SYS] OVL bit changing to %d\n", value & 1);
             overlay = value & 1;
+            extern int fast_page0;
+
+            /* If fast_page_zero is active either map to ROM or to physical ARM RAM at address 0 */
+            if (fast_page0)
+            {
+                if (overlay)
+                    mmu_map(0xf80000, 0x0, 4096, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_READ_ONLY | MMU_ATTR_CACHED, 0);
+                else
+                    mmu_map(0x0, 0x0, 4096, MMU_ACCESS | MMU_ISHARE | MMU_ALLOW_EL0 | MMU_ATTR_CACHED, 0);
+            }
         }
     }
 
@@ -402,7 +413,7 @@ int SYSWriteValToAddr(uint64_t value, uint64_t value2, int size, uint64_t far)
         }
     }
 
-    if (far >= 0xe80000 && far <= 0xe8ffff && board[board_idx])
+    if (!zorro_disable && far >= 0xe80000 && far <= 0xe8ffff && board[board_idx])
     {
         if (board[board_idx]->is_z3)
         {
@@ -470,7 +481,6 @@ int SYSWriteValToAddr(uint64_t value, uint64_t value2, int size, uint64_t far)
     return 1;
 }
 
-
 int SYSReadValFromAddr(uint64_t *value, uint64_t *value2, int size, uint64_t far)
 {
     D(kprintf("[JIT:SYS] SYSReadValFromAddr(%d, %p)\n", size, far));
@@ -485,9 +495,33 @@ int SYSReadValFromAddr(uint64_t *value, uint64_t *value2, int size, uint64_t far
 
     if (far >= 0x1000000) {
         // Unmapped Z3 address
-        *value = ~0ULL;
-        if (size == 16)
-            *value2 = ~0ULL;
+
+        static const uint64_t u64[5] = {
+            0xBAD00BAD00BAD00BULL, 0xAD00BAD00BAD00BAULL,
+            0x00BAD00BAD00BAD0ULL, 0x0BAD00BAD00BAD00ULL
+        };
+        uintptr_t p64 = (uintptr_t)&u64[2] - (15 - (far & 15));
+
+        switch (size)
+        {
+            case 1:
+                *value = *(uint8_t*)p64;
+                break;
+            case 2:
+                *value = *(uint16_t*)p64;
+                break;
+            case 4:
+                *value = *(uint32_t*)p64;
+                break;
+            case 8:
+                *value = *(uint64_t*)p64;
+                break;
+            case 16:
+                *value = *(uint64_t*)p64;
+                *value2 = *(uint64_t*)(p64 + 8);
+                break;
+        }
+
         return 1;
     }
 
@@ -497,15 +531,7 @@ int SYSReadValFromAddr(uint64_t *value, uint64_t *value2, int size, uint64_t far
         return 1;
     }
 
-#if 0
-    if (far > (0x1000000ULL - size)) {
-     //   kprintf("Illegal FAR %08x\n", far);
-        *value = 0;
-        return 1;
-    }
-#endif
-
-    if (far >= 0xe80000 && far <= 0xe8ffff && size == 1)
+    if (!zorro_disable && far >= 0xe80000 && far <= 0xe8ffff && size == 1)
     {
         while(board[board_idx] && !board[board_idx]->enabled) {
             board_idx++;

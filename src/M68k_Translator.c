@@ -330,7 +330,11 @@ static inline uintptr_t M68K_Translate(uint16_t *m68kcodeptr)
     M68K_ResetReturnStack();
 
     if (debug) {
+<<<<<<< HEAD
         uint32_t hash_calc = (hash >> EMU68_HASH_SHIFT) & EMU68_HASH_MASK;
+=======
+        uint32_t hash_calc = (hash >> EMU68_HASHSHIFT) & EMU68_HASHMASK;
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
         kprintf("[ICache] Creating new translation unit with hash %04x (m68k code @ %p)\n", hash_calc, (void*)m68kcodeptr);
         if (debug > 1)
             M68K_PrintContext(__m68k_state);
@@ -367,6 +371,9 @@ static inline uintptr_t M68K_Translate(uint16_t *m68kcodeptr)
     int inner_loop = FALSE;
     int soft_break = FALSE;
     int max_rev_jumps = 0;
+    m68k_low = m68kcodeptr;
+    m68k_high = m68kcodeptr + 16;
+
     m68k_low = m68kcodeptr;
     m68k_high = m68kcodeptr + 16;
 
@@ -647,7 +654,11 @@ struct M68KTranslationUnit *M68K_GetTranslationUnit(uint16_t *m68kcodeptr)
     }
 
     /* Get 16-bit has from the pointer to m68k code */
+<<<<<<< HEAD
     hash = (hash >> EMU68_HASHSHIFT)) & EMU68_HASHMASK;
+=======
+    hash = (hash >> EMU68_HASHSHIFT) & EMU68_HASHMASK;
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
 
     if (debug > 2)
         kprintf("[ICache] GetTranslationUnit(%08x)\n[ICache] Hash: 0x%04x\n", (void*)m68kcodeptr, (int)hash);
@@ -661,6 +672,10 @@ struct M68KTranslationUnit *M68K_GetTranslationUnit(uint16_t *m68kcodeptr)
 
         do {
             unit = tlsf_malloc_aligned(jit_tlsf, unit_length, 64);
+<<<<<<< HEAD
+=======
+
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
             __m68k_state->JIT_CACHE_FREE = tlsf_get_free_size(jit_tlsf);
 
             if (unit == NULL)
@@ -685,7 +700,11 @@ struct M68KTranslationUnit *M68K_GetTranslationUnit(uint16_t *m68kcodeptr)
                     __m68k_state->JIT_UNIT_COUNT--;
                 }
                 __m68k_state->JIT_CACHE_FREE = tlsf_get_free_size(jit_tlsf);
+<<<<<<< HEAD
 
+=======
+                
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
                 asm volatile("msr tpidr_el1, %0"::"r"(0xffffffff));
             }
         } while(unit == NULL);
@@ -750,6 +769,10 @@ struct M68KTranslationUnit *M68K_GetTranslationUnit(uint16_t *m68kcodeptr)
             }
         }
     }
+<<<<<<< HEAD
+=======
+
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
     //asm volatile ("prfm plil1keep, [%0]"::"r"(unit->mt_ARMEntryPoint));
 
     return unit;
@@ -763,11 +786,16 @@ void M68K_InitializeCache()
     NEWLIST(&LRU);
 
     kprintf("[ICache] Setting up ICache\n");
+<<<<<<< HEAD
+=======
+
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
     temporary_arm_code = tlsf_malloc(jit_tlsf, (JCCB_INSN_DEPTH_MASK + 1) * 16 * 64);
     __m68k_state->JIT_CACHE_FREE = tlsf_get_free_size(jit_tlsf);
     kprintf("[ICache] Temporary code at %p\n", temporary_arm_code);
     local_state = tlsf_malloc(tlsf, sizeof(struct M68KLocalState)*(JCCB_INSN_DEPTH_MASK + 1)*2);
     kprintf("[ICache] ICache array at %p\n", ICache);
+
     for (int i=0; i < 65536; i++)
         NEWLIST(&ICache[i]);
 }
@@ -849,7 +877,6 @@ uint32_t *EMIT_InjectPrintContext(uint32_t *ptr)
     return ptr;
 }
 
-
 static void put_to_stream(void *d, char c)
 {
     char **pptr = (char**)d;
@@ -862,7 +889,6 @@ static void put_to_stream(void *d, char c)
 
 uint32_t *EMIT_InjectDebugStringV(uint32_t *ptr, const char * restrict format, va_list args)
 {
-#ifdef __aarch64__
     void *tmp;
     uint32_t *tmpptr;
 
@@ -907,9 +933,7 @@ uint32_t *EMIT_InjectDebugStringV(uint32_t *ptr, const char * restrict format, v
     ptr[-1] = b(1 + ((uintptr_t)tmp - (uintptr_t)ptr) / 4);
 
     ptr = (uint32_t *)tmp;
-#else
 
-#endif
     return ptr;
 }
 

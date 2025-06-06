@@ -12,9 +12,14 @@
 
 #include <stdint.h>
 #include <stdarg.h>
+<<<<<<< HEAD
 #ifdef __aarch64__
 #include "A64.h"
 #endif
+=======
+
+#include "A64.h"
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
 
 #ifdef NULL
 #undef NULL
@@ -27,8 +32,12 @@
 #define str(s) #s
 
 #define _abs(x) ((x) < 0 ? -(x) : (x))
+<<<<<<< HEAD
 #define xstr(s) str(s)
 #define str(s) #s
+=======
+
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
 typedef struct {
     uint64_t hi;
     uint64_t lo;
@@ -113,6 +122,10 @@ static inline void dsb() {
 static inline void dmb() {
     asm volatile ("dmb sy");
 }
+<<<<<<< HEAD
+=======
+
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
 typedef void (*putc_func)(void *data, char c);
 void vkprintf_pc(putc_func putc_f, void *putc_data, const char * format, va_list args);
 void kprintf_pc(putc_func putc_f, void *putc_data, const char * format, ...);
@@ -174,7 +187,12 @@ struct Result64 sldiv(int64_t n, int64_t d);
 #include "support_rpi.h"
 #endif
 
+<<<<<<< HEAD
 #define likely(x) __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
+=======
+#define likely(x)      __builtin_expect(!!(x), 1) 
+#define unlikely(x)    __builtin_expect(!!(x), 0)
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
 
 #endif /* _SUPPORT_H */

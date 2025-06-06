@@ -75,6 +75,7 @@ static uint32_t *EMIT_CMPM(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
 
     switch (size)
     {
+<<<<<<< HEAD
     case 4:
         *ptr++ = subs_reg(tmp, dst, src, LSL, 0);
         break;
@@ -86,6 +87,19 @@ static uint32_t *EMIT_CMPM(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
         *ptr++ = lsl(tmp, dst, 24);
         *ptr++ = subs_reg(tmp, tmp, src, LSL, 24);
         break;
+=======
+        case 4:
+            *ptr++ = subs_reg(tmp, dst, src, LSL, 0);
+            break;
+        case 2:
+            *ptr++ = lsl(tmp, dst, 16);
+            *ptr++ = subs_reg(tmp, tmp, src, LSL, 16);
+            break;
+        case 1:
+            *ptr++ = lsl(tmp, dst, 24);
+            *ptr++ = subs_reg(tmp, tmp, src, LSL, 24);
+            break;
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
     }
 
     RA_FreeARMRegister(&ptr, tmp);
@@ -204,6 +218,7 @@ static uint32_t *EMIT_EOR_ext(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_pt
 
         switch (size)
         {
+<<<<<<< HEAD
         case 4:
             *ptr++ = eor_reg(dest, dest, src, LSL, 0);
             break;
@@ -219,6 +234,23 @@ static uint32_t *EMIT_EOR_ext(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_pt
             *ptr++ = bfi(dest, tmp, 0, 8);
             RA_FreeARMRegister(&ptr, tmp);
             break;
+=======
+            case 4:
+                *ptr++ = eor_reg(dest, dest, src, LSL, 0);
+                break;
+            case 2:
+                tmp = RA_AllocARMRegister(&ptr);
+                *ptr++ = eor_reg(tmp, src, dest, LSL, 0);
+                *ptr++ = bfi(dest, tmp, 0, 16);
+                RA_FreeARMRegister(&ptr, tmp);
+                break;
+            case 1:
+                tmp = RA_AllocARMRegister(&ptr);
+                *ptr++ = eor_reg(tmp, src, dest, LSL, 0);
+                *ptr++ = bfi(dest, tmp, 0, 8);
+                RA_FreeARMRegister(&ptr, tmp);
+                break;
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
         }
 
         RA_FreeARMRegister(&ptr, src);
@@ -251,6 +283,10 @@ static uint32_t *EMIT_EOR_ext(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_pt
 
             /* Perform calcualtion */
             *ptr++ = eor_reg(tmp, tmp, src, LSL, 0);
+<<<<<<< HEAD
+=======
+
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
             /* Store back */
             if (mode == 3)
             {
@@ -260,6 +296,7 @@ static uint32_t *EMIT_EOR_ext(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_pt
             else
                 *ptr++ = str_offset(dest, tmp, 0);
             break;
+        
         case 2:
             if (mode == 4)
             {
@@ -268,8 +305,13 @@ static uint32_t *EMIT_EOR_ext(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_pt
             }
             else
                 *ptr++ = ldrh_offset(dest, tmp, 0);
+            
             /* Perform calcualtion */
             *ptr++ = eor_reg(tmp, tmp, src, LSL, 0);
+<<<<<<< HEAD
+=======
+
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
             /* Store back */
             if (mode == 3)
             {
@@ -290,6 +332,10 @@ static uint32_t *EMIT_EOR_ext(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_pt
 
             /* Perform calcualtion */
             *ptr++ = eor_reg(tmp, tmp, src, LSL, 0);
+<<<<<<< HEAD
+=======
+
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
             /* Store back */
             if (mode == 3)
             {
@@ -321,6 +367,10 @@ static uint32_t *EMIT_EOR_ext(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_pt
                 *ptr++ = cmn_reg(31, test_register, LSL, 24);
                 break;
         }
+<<<<<<< HEAD
+=======
+        
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
         uint8_t cc = RA_ModifyCC(&ptr);
         ptr = EMIT_GetNZ00(ptr, cc, &update_mask);
 

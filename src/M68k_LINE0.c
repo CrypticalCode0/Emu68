@@ -59,7 +59,12 @@ uint32_t *EMIT_CMPI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
         uint8_t tmpreg = RA_AllocARMRegister(&ptr);
 
         /* Perform add operation */
+<<<<<<< HEAD
         switch (size) {
+=======
+        switch (size)
+        {
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
             case 4:
                 if (immediate)
                     *ptr++ = cmp_immed(dest, u32);
@@ -84,6 +89,7 @@ uint32_t *EMIT_CMPI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
         uint8_t tmpreg = RA_AllocARMRegister(&ptr);
 
         /* Fetch data into temporary register, perform add, store it back */
+<<<<<<< HEAD
         switch (size) {
         case 4:
             /* Perform calcualtion */
@@ -102,6 +108,27 @@ uint32_t *EMIT_CMPI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
             *ptr++ = lsl(tmpreg, dest, 24);
             *ptr++ = cmp_reg(tmpreg, immed, LSL, 0);
             break;
+=======
+        switch (size)
+        {
+            case 4:
+                /* Perform calcualtion */
+                if (immediate)
+                    *ptr++ = cmp_immed(dest, u32);
+                else
+                    *ptr++ = cmp_reg(dest, immed, LSL, 0);
+                break;
+            case 2:
+                /* Perform calcualtion */
+                *ptr++ = lsl(tmpreg, dest, 16);
+                *ptr++ = cmp_reg(tmpreg, immed, LSL, 0);
+                break;
+            case 1:
+                /* Perform calcualtion */
+                *ptr++ = lsl(tmpreg, dest, 24);
+                *ptr++ = cmp_reg(tmpreg, immed, LSL, 0);
+                break;
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
         }
 
         RA_FreeARMRegister(&ptr, tmpreg);
@@ -185,7 +212,12 @@ uint32_t *EMIT_SUBI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
         RA_SetDirtyM68kRegister(&ptr, opcode & 7);
 
         /* Perform add operation */
+<<<<<<< HEAD
         switch (size) {
+=======
+        switch (size)
+        {
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
             case 4:
                 if (immediate)
                     *ptr++ = subs_immed(dest, dest, u32 & 0xffff);
@@ -266,6 +298,10 @@ uint32_t *EMIT_SUBI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                 *ptr++ = subs_immed(immed, tmp, u32);
             else
                 *ptr++ = subs_reg(immed, tmp, immed, LSL, 0);
+<<<<<<< HEAD
+=======
+
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
             /* Store back */
             if (mode == 3)
             {
@@ -283,8 +319,13 @@ uint32_t *EMIT_SUBI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
             }
             else
                 *ptr++ = ldrh_offset(dest, tmp, 0);
+            
             /* Perform calcualtion */
+<<<<<<< HEAD
             if (update_mask == 0) {
+=======
+            if (update_mask == 0) {               
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
                 if (lo16 & 0xfff || lo16 == 0)
                     *ptr++ = sub_immed(immed, tmp, lo16 & 0xfff);
                 if (lo16 & 0xf000) {
@@ -305,6 +346,10 @@ uint32_t *EMIT_SUBI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                 *ptr++ = subs_reg(immed, tmp, immed, LSL, 0);
                 *ptr++ = lsr(immed, immed, 16);
             }
+<<<<<<< HEAD
+=======
+
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
             /* Store back */
             if (mode == 3)
             {
@@ -322,6 +367,7 @@ uint32_t *EMIT_SUBI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
             }
             else
                 *ptr++ = ldrb_offset(dest, tmp, 0);
+
             /* Perform calcualtion */
             if (update_mask == 0) {
                 *ptr++ = sub_immed(immed, tmp, lo16 & 0xff);
@@ -337,6 +383,10 @@ uint32_t *EMIT_SUBI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                 *ptr++ = subs_reg(immed, tmp, immed, LSL, 0);
                 *ptr++ = lsr(immed, immed, 24);
             }
+<<<<<<< HEAD
+=======
+
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
             /* Store back */
             if (mode == 3)
             {
@@ -414,7 +464,12 @@ uint32_t *EMIT_ADDI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
         case 0x0080:    /* Long operation */
             u32 = cache_read_16(ICACHE, (uintptr_t)&(*m68k_ptr)[ext_count++]) << 16;
             u32 |= cache_read_16(ICACHE, (uintptr_t)&(*m68k_ptr)[ext_count++]);
+<<<<<<< HEAD
             if (u32 < 4096) {
+=======
+            if (u32 < 4096)
+            {
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
                 add_immediate = 1;
             }
             else
@@ -442,7 +497,12 @@ uint32_t *EMIT_ADDI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
         RA_SetDirtyM68kRegister(&ptr, opcode & 7);
 
         /* Perform add operation */
+<<<<<<< HEAD
         switch(size) {
+=======
+        switch(size)
+        {
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
             case 4:
                 if (add_immediate)
                     *ptr++ = adds_immed(dest, dest, u32);
@@ -518,6 +578,10 @@ uint32_t *EMIT_ADDI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                     *ptr++ = adds_immed(immed, tmp, u32);
                 else
                     *ptr++ = adds_reg(immed, immed, tmp, LSL, 0);
+<<<<<<< HEAD
+=======
+
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
                 /* Store back */
                 if (mode == 3)
                 {
@@ -535,6 +599,7 @@ uint32_t *EMIT_ADDI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                 }
                 else
                     *ptr++ = ldrh_offset(dest, tmp, 0);
+                
                 /* Perform calcualtion */
                 if (update_mask == 0) {
                     if (lo16 & 0xfff || lo16 == 0)
@@ -556,6 +621,10 @@ uint32_t *EMIT_ADDI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                     *ptr++ = adds_reg(immed, immed, tmp, LSL, 16);
                     *ptr++ = lsr(immed, immed, 16);
                 }
+<<<<<<< HEAD
+=======
+
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
                 /* Store back */
                 if (mode == 3)
                 {
@@ -573,6 +642,7 @@ uint32_t *EMIT_ADDI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                 }
                 else
                     *ptr++ = ldrb_offset(dest, tmp, 0);
+                
                 /* Perform calcualtion */
                 if (update_mask == 0) {
                     *ptr++ = add_immed(immed, tmp, lo16 & 0xff);
@@ -587,6 +657,10 @@ uint32_t *EMIT_ADDI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                     *ptr++ = adds_reg(immed, immed, tmp, LSL, 24);
                     *ptr++ = lsr(immed, immed, 24);
                 }
+<<<<<<< HEAD
+=======
+
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
                 /* Store back */
                 if (mode == 3)
                 {
@@ -1204,7 +1278,12 @@ uint32_t *EMIT_ANDI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
         RA_SetDirtyM68kRegister(&ptr, opcode & 7);
 
         /* Perform add operation */
+<<<<<<< HEAD
         switch(size) {
+=======
+        switch(size)
+        {
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
             case 4:
                 if (mask32 == 0)
                     *ptr++ = ands_reg(dest, immed, dest, LSL, 0);
@@ -1265,6 +1344,10 @@ uint32_t *EMIT_ANDI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                     *ptr++ = ands_reg(immed, immed, tmp, LSL, 0);
                 else
                     *ptr++ = ands_immed(immed, tmp, (mask32 >> 16) & 0x3f, (32 - (mask32 & 0x3f)) & 31);
+<<<<<<< HEAD
+=======
+
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
                 /* Store back */
                 if (mode == 3)
                 {
@@ -1282,6 +1365,7 @@ uint32_t *EMIT_ANDI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                 }
                 else
                     *ptr++ = ldrh_offset(dest, tmp, 0);
+                
                 /* Perform calcualtion */
                 if (update_mask == 0) {
                     if (mask32 == 0)
@@ -1293,6 +1377,10 @@ uint32_t *EMIT_ANDI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                     *ptr++ = ands_reg(immed, immed, tmp, LSL, 16);
                     *ptr++ = lsr(immed, immed, 16);
                 }
+<<<<<<< HEAD
+=======
+
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
                 /* Store back */
                 if (mode == 3)
                 {
@@ -1310,6 +1398,7 @@ uint32_t *EMIT_ANDI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                 }
                 else
                     *ptr++ = ldrb_offset(dest, tmp, 0);
+                
                 /* Perform calcualtion */
                 if (update_mask == 0) {
                     if (mask32 == 0)
@@ -1321,6 +1410,10 @@ uint32_t *EMIT_ANDI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                     *ptr++ = ands_reg(immed, immed, tmp, LSL, 24);
                     *ptr++ = lsr(immed, immed, 24);
                 }
+<<<<<<< HEAD
+=======
+
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
                 /* Store back */
                 if (mode == 3)
                 {
@@ -1506,7 +1599,12 @@ uint32_t *EMIT_EORI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
         RA_SetDirtyM68kRegister(&ptr, opcode & 7);
 
         /* Perform add operation */
+<<<<<<< HEAD
         switch(size) {
+=======
+        switch(size)
+        {
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
             case 4:
                 if (mask32 == 0)
                     *ptr++ = eor_reg(dest, dest, immed, LSL, 0);
@@ -1559,6 +1657,10 @@ uint32_t *EMIT_EORI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                     *ptr++ = eor_immed(immed, tmp, (mask32 >> 16) & 0x3f, (32 - (mask32 & 0x3f)) & 31);
                 tst_pos = ptr;
                 *ptr++ = cmn_reg(31, immed, LSL, 0);
+<<<<<<< HEAD
+=======
+
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
                 /* Store back */
                 if (mode == 3)
                 {
@@ -1576,11 +1678,16 @@ uint32_t *EMIT_EORI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                 }
                 else
                     *ptr++ = ldrh_offset(dest, tmp, 0);
+                
                 /* Perform calcualtion */
                 *ptr++ = eor_reg(immed, immed, tmp, LSL, 16);
                 tst_pos = ptr;
                 *ptr++ = cmn_reg(31, immed, LSL, 0);
                 *ptr++ = lsr(immed, immed, 16);
+<<<<<<< HEAD
+=======
+
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
                 /* Store back */
                 if (mode == 3)
                 {
@@ -1590,6 +1697,7 @@ uint32_t *EMIT_EORI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                 else
                     *ptr++ = strh_offset(dest, immed, 0);
                 break;
+            
             case 1:
                 if (mode == 4)
                 {
@@ -1598,11 +1706,16 @@ uint32_t *EMIT_EORI(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                 }
                 else
                     *ptr++ = ldrb_offset(dest, tmp, 0);
+                
                 /* Perform calcualtion */
                 *ptr++ = eor_reg(immed, immed, tmp, LSL, 24);
                 tst_pos = ptr;
                 *ptr++ = cmn_reg(31, immed, LSL, 0);
                 *ptr++ = lsr(immed, immed, 24);
+<<<<<<< HEAD
+=======
+
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
                 /* Store back */
                 if (mode == 3)
                 {
@@ -1710,20 +1823,12 @@ uint32_t *EMIT_BTST(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     if (update_mask)
     {
         uint8_t cc = RA_ModifyCC(&ptr);
-#if 1
+
         if (update_mask & SR_Z)
         {
             *ptr++ = cset(0, A64_CC_EQ);
             *ptr++ = bfi(cc, 0, SRB_Z, 1);
         }
-#else
-        uint8_t alt_flags = update_mask;
-        if ((alt_flags & 3) != 0 && (alt_flags & 3) < 3)
-            alt_flags ^= 3;
-        ptr = EMIT_ClearFlags(ptr, cc, alt_flags);
-        if (update_mask & SR_Z)
-            ptr = EMIT_SetFlagsConditional(ptr, cc, SR_Z, ARM_CC_EQ);
-#endif
     }
 
     return ptr;
@@ -1760,12 +1865,22 @@ uint32_t *EMIT_BCHG(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
         dest = RA_MapM68kRegister(&ptr, opcode & 7);
         RA_SetDirtyM68kRegister(&ptr, opcode & 7);
 
+<<<<<<< HEAD
         if (immediate) {
+=======
+        if (immediate)
+        {
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
             tst_pos = ptr;
             *ptr++ = tst_immed(dest, 1, 31 & (32 - imm_shift));
             *ptr++ = eor_immed(dest, dest, 1, 31 & (32 - imm_shift));
         }
+<<<<<<< HEAD
         else {
+=======
+        else
+        {
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
             *ptr++ = and_immed(bit_number, bit_number, 5, 0);
             *ptr++ = lslv(bit_mask, bit_mask, bit_number);
 
@@ -1828,20 +1943,12 @@ uint32_t *EMIT_BCHG(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     if (update_mask)
     {
         uint8_t cc = RA_ModifyCC(&ptr);
-#if 1
+
         if (update_mask & SR_Z)
         {
             *ptr++ = cset(0, A64_CC_EQ);
             *ptr++ = bfi(cc, 0, SRB_Z, 1);
         }
-#else
-        uint8_t alt_flags = update_mask;
-        if ((alt_flags & 3) != 0 && (alt_flags & 3) < 3)
-            alt_flags ^= 3;
-        ptr = EMIT_ClearFlags(ptr, cc, alt_flags);
-        if (update_mask & SR_Z)
-            ptr = EMIT_SetFlagsConditional(ptr, cc, SR_Z, ARM_CC_EQ);
-#endif
     } else {
         for (uint32_t *p = tst_pos; p < ptr; p++)
             p[0] = p[1];
@@ -1952,20 +2059,12 @@ uint32_t *EMIT_BCLR(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     if (update_mask)
     {
         uint8_t cc = RA_ModifyCC(&ptr);
-#if 1
+
         if (update_mask & SR_Z)
         {
             *ptr++ = cset(0, A64_CC_EQ);
             *ptr++ = bfi(cc, 0, SRB_Z, 1);
         }
-#else
-        uint8_t alt_flags = update_mask;
-        if ((alt_flags & 3) != 0 && (alt_flags & 3) < 3)
-            alt_flags ^= 3;
-        ptr = EMIT_ClearFlags(ptr, cc, alt_flags);
-        if (update_mask & SR_Z)
-            ptr = EMIT_SetFlagsConditional(ptr, cc, SR_Z, ARM_CC_EQ);
-#endif
     } else {
         for (uint32_t *p = tst_pos; p < ptr; p++)
             p[0] = p[1];
@@ -2197,20 +2296,12 @@ uint32_t *EMIT_BSET(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     if (update_mask)
     {
         uint8_t cc = RA_ModifyCC(&ptr);
-#if 1
+
         if (update_mask & SR_Z)
         {
             *ptr++ = cset(0, A64_CC_EQ);
             *ptr++ = bfi(cc, 0, SRB_Z, 1);
         }
-#else
-        uint8_t alt_flags = update_mask;
-        if ((alt_flags & 3) != 0 && (alt_flags & 3) < 3)
-            alt_flags ^= 3;
-        ptr = EMIT_ClearFlags(ptr, cc, alt_flags);
-        if (update_mask & SR_Z)
-            ptr = EMIT_SetFlagsConditional(ptr, cc, SR_Z, ARM_CC_EQ);
-#endif
     } else {
         for (uint32_t *p = tst_pos; p < ptr; p++)
             p[0] = p[1];
@@ -2664,6 +2755,10 @@ uint32_t *EMIT_MOVEP(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
     RA_FreeARMRegister(&ptr, tmp);
     ptr = EMIT_AdvancePC(ptr, 4);
     (*m68k_ptr)++;
+<<<<<<< HEAD
+=======
+
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
     return ptr;
 }
 

@@ -199,6 +199,10 @@ uint8_t RA_GetFPCR(uint32_t **ptr)
     if (reg_FPCR == 0xff)
     {
         reg_FPCR = RA_AllocARMRegister(ptr);
+<<<<<<< HEAD
+=======
+
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
         **ptr = mov_simd_to_reg(reg_FPCR, 29, TS_H, 4);
         (*ptr)++;
         mod_FPCR = 0;
@@ -243,6 +247,10 @@ uint8_t RA_GetFPSR(uint32_t **ptr)
     if (reg_FPSR == 0xff)
     {
         reg_FPSR = RA_AllocARMRegister(ptr);
+<<<<<<< HEAD
+=======
+
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
         **ptr = mov_simd_to_reg(reg_FPSR, 29, TS_S, 0);
         (*ptr)++;
         mod_FPSR = 0;

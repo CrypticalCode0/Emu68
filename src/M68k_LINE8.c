@@ -166,6 +166,7 @@ uint32_t *EMIT_OR_reg(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
 
         switch (size)
         {
+<<<<<<< HEAD
         case 4:
             *ptr++ = orr_reg(dest, dest, src, LSL, 0);
             break;
@@ -177,6 +178,19 @@ uint32_t *EMIT_OR_reg(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
             *ptr++ = orr_reg(src, src, dest, LSL, 0);
             *ptr++ = bfi(dest, src, 0, 8);
             break;
+=======
+            case 4:
+                *ptr++ = orr_reg(dest, dest, src, LSL, 0);
+                break;
+            case 2:
+                *ptr++ = orr_reg(src, src, dest, LSL, 0);
+                *ptr++ = bfi(dest, src, 0, 16);
+                break;
+            case 1:
+                *ptr++ = orr_reg(src, src, dest, LSL, 0);
+                *ptr++ = bfi(dest, src, 0, 8);
+                break;
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
         }
 
         RA_FreeARMRegister(&ptr, src);
@@ -209,6 +223,10 @@ uint32_t *EMIT_OR_reg(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
 
             /* Perform calcualtion */
             *ptr++ = orr_reg(tmp, tmp, src, LSL, 0);
+<<<<<<< HEAD
+=======
+
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
             /* Store back */
             if (mode == 3)
             {
@@ -218,6 +236,7 @@ uint32_t *EMIT_OR_reg(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
             else
                 *ptr++ = str_offset(dest, tmp, 0);
             break;
+        
         case 2:
             if (mode == 4)
             {
@@ -226,8 +245,13 @@ uint32_t *EMIT_OR_reg(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
             }
             else
                 *ptr++ = ldrh_offset(dest, tmp, 0);
+            
             /* Perform calcualtion */
             *ptr++ = orr_reg(tmp, tmp, src, LSL, 0);
+<<<<<<< HEAD
+=======
+
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
             /* Store back */
             if (mode == 3)
             {
@@ -237,6 +261,7 @@ uint32_t *EMIT_OR_reg(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
             else
                 *ptr++ = strh_offset(dest, tmp, 0);
             break;
+        
         case 1:
             if (mode == 4)
             {
@@ -248,6 +273,10 @@ uint32_t *EMIT_OR_reg(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
 
             /* Perform calcualtion */
             *ptr++ = orr_reg(tmp, tmp, src, LSL, 0);
+<<<<<<< HEAD
+=======
+
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
             /* Store back */
             if (mode == 3)
             {

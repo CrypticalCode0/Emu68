@@ -140,6 +140,10 @@ static uint32_t *EMIT_ADD_ext(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_pt
 
             /* Perform calcualtion */
             *ptr++ = adds_reg(tmp, tmp, src, LSL, 0);
+<<<<<<< HEAD
+=======
+
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
             /* Store back */
             if (mode == 3)
             {
@@ -149,6 +153,7 @@ static uint32_t *EMIT_ADD_ext(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_pt
             else
                 *ptr++ = str_offset(dest, tmp, 0);
             break;
+        
         case 2:
             if (mode == 4)
             {
@@ -157,6 +162,7 @@ static uint32_t *EMIT_ADD_ext(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_pt
             }
             else
                 *ptr++ = ldrh_offset(dest, tmp, 0);
+            
             /* Perform calcualtion */
             if (update_mask == 0 || update_mask == SR_Z || update_mask == SR_N) {
                 *ptr++ = add_reg(tmp, tmp, src, LSL, 0);
@@ -167,6 +173,10 @@ static uint32_t *EMIT_ADD_ext(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_pt
                 *ptr++ = adds_reg(tmp, tmp, src, LSL, 16);
                 *ptr++ = lsr(tmp, tmp, 16);
             }
+<<<<<<< HEAD
+=======
+
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
             /* Store back */
             if (mode == 3)
             {
@@ -195,6 +205,10 @@ static uint32_t *EMIT_ADD_ext(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_pt
                 *ptr++ = adds_reg(tmp, tmp, src, LSL, 24);
                 *ptr++ = lsr(tmp, tmp, 24);
             }
+<<<<<<< HEAD
+=======
+
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
             /* Store back */
             if (mode == 3)
             {
@@ -423,6 +437,7 @@ static uint32_t *EMIT_ADDX_mem(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_p
                 RA_FreeARMRegister(&ptr, tmp);
                 RA_FreeARMRegister(&ptr, tmp_2);
                 break;
+
             case 1: /* Word */
                 tmp = RA_AllocARMRegister(&ptr);
                 tmp_2 = RA_AllocARMRegister(&ptr);
@@ -459,6 +474,7 @@ static uint32_t *EMIT_ADDX_mem(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_p
                 RA_FreeARMRegister(&ptr, tmp);
                 RA_FreeARMRegister(&ptr, tmp_2);
                 break;
+
             case 2: /* Long */
                 *ptr++ = adcs(regy, regy, regx);
                 break;
@@ -485,6 +501,10 @@ static uint32_t *EMIT_ADDX_mem(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_p
             case 0: /* Byte */
                 *ptr++ = ldrb_offset_preindex(regx, src, (opcode & 7) == 7 ? -2 : -1);
                 *ptr++ = ldrb_offset_preindex(regy, dest, ((opcode >> 9) & 7) == 7 ? -2 : -1);
+<<<<<<< HEAD
+=======
+
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
                 tmp = RA_AllocARMRegister(&ptr);
                 *ptr++ = add_reg(tmp, dest, src, LSL, 0);
                 *ptr++ = csinc(tmp, tmp, tmp, A64_CC_EQ);
@@ -518,9 +538,14 @@ static uint32_t *EMIT_ADDX_mem(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_p
                 *ptr++ = strb_offset(regy, tmp, 0);
                 RA_FreeARMRegister(&ptr, tmp);
                 break;
+
             case 1: /* Word */
                 *ptr++ = ldrh_offset_preindex(regx, src, -2);
                 *ptr++ = ldrh_offset_preindex(regy, dest, -2);
+<<<<<<< HEAD
+=======
+
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
                 tmp = RA_AllocARMRegister(&ptr);
 
                 *ptr++ = add_reg(tmp, src, dest, LSL, 0);
@@ -555,9 +580,14 @@ static uint32_t *EMIT_ADDX_mem(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_p
                 *ptr++ = strh_offset(regy, tmp, 0);
                 RA_FreeARMRegister(&ptr, tmp);
                 break;
+
             case 2: /* Long */
                 *ptr++ = ldr_offset_preindex(regx, src, -4);
                 *ptr++ = ldr_offset_preindex(regy, dest, -4);
+<<<<<<< HEAD
+=======
+
+>>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
                 tmp = RA_AllocARMRegister(&ptr);
                 *ptr++ = adcs(dest, dest, src);
                 *ptr++ = str_offset(regy, dest, 0);
