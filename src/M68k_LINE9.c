@@ -151,10 +151,7 @@ uint32_t *EMIT_SUB_reg(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
 
             /* Perform calcualtion */
             *ptr++ = subs_reg(tmp, tmp, src, LSL, 0);
-<<<<<<< HEAD
-=======
 
->>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
             /* Store back */
             if (mode == 3)
             {
@@ -164,7 +161,7 @@ uint32_t *EMIT_SUB_reg(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
             else
                 *ptr++ = str_offset(dest, tmp, 0);
             break;
-        
+
         case 2:
             if (mode == 4)
             {
@@ -173,7 +170,7 @@ uint32_t *EMIT_SUB_reg(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
             }
             else
                 *ptr++ = ldrh_offset(dest, tmp, 0);
-            
+
             /* Perform calcualtion */
             if (update_mask == 0 || update_mask == SR_Z || update_mask == SR_N) {
                 *ptr++ = sub_reg(tmp, tmp, src, LSL, 0);
@@ -183,10 +180,7 @@ uint32_t *EMIT_SUB_reg(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                 *ptr++ = subs_reg(tmp, tmp, src, LSL, 16);
                 *ptr++ = lsr(tmp, tmp, 16);
             }
-<<<<<<< HEAD
-=======
 
->>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
             /* Store back */
             if (mode == 3)
             {
@@ -196,7 +190,7 @@ uint32_t *EMIT_SUB_reg(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
             else
                 *ptr++ = strh_offset(dest, tmp, 0);
             break;
-        
+
         case 1:
             if (mode == 4)
             {
@@ -215,10 +209,7 @@ uint32_t *EMIT_SUB_reg(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                 *ptr++ = subs_reg(tmp, tmp, src, LSL, 24);
                 *ptr++ = lsr(tmp, tmp, 24);
             }
-<<<<<<< HEAD
-=======
 
->>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
             /* Store back */
             if (mode == 3)
             {
@@ -474,10 +465,6 @@ uint32_t *EMIT_SUBX_reg(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                 RA_FreeARMRegister(&ptr, tmp);
                 RA_FreeARMRegister(&ptr, tmp_2);
                 break;
-<<<<<<< HEAD
-            case 1: /* Word */
-=======
->>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
 
             case 1: /* Word */
                 tmp = RA_AllocARMRegister(&ptr);
@@ -515,17 +502,6 @@ uint32_t *EMIT_SUBX_reg(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
                 *ptr++ = bfxil(regy, tmp, 0, 16);
                 RA_FreeARMRegister(&ptr, tmp);
                 RA_FreeARMRegister(&ptr, tmp_2);
-<<<<<<< HEAD
-#if 0
-                tmp = RA_AllocARMRegister(&ptr);
-                *ptr++ = csetm(tmp, A64_CC_NE);
-                *ptr++ = add_reg(tmp, tmp, regy, LSL, 16);
-                *ptr++ = subs_reg(tmp, tmp, regx, LSL, 16);
-                *ptr++ = bfxil(regy, tmp, 16, 16);
-                RA_FreeARMRegister(&ptr, tmp);
-#endif
-=======
->>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
                 break;
 
             case 2: /* Long */
@@ -552,10 +528,7 @@ uint32_t *EMIT_SUBX_reg(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
             case 0: /* Byte */
                 *ptr++ = ldrb_offset_preindex(regx, src, (opcode & 7) == 7 ? -2 : -1);
                 *ptr++ = ldrb_offset_preindex(regy, dest, ((opcode >> 9) & 7) == 7 ? -2 : -1);
-<<<<<<< HEAD
-=======
 
->>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
                 tmp = RA_AllocARMRegister(&ptr);
 
                 *ptr++ = sub_reg(tmp, dest, src, LSL, 0);
@@ -634,10 +607,7 @@ uint32_t *EMIT_SUBX_reg(uint32_t *ptr, uint16_t opcode, uint16_t **m68k_ptr)
             case 2: /* Long */
                 *ptr++ = ldr_offset_preindex(regx, src, -4);
                 *ptr++ = ldr_offset_preindex(regy, dest, -4);
-<<<<<<< HEAD
-=======
 
->>>>>>> d1be4382119dbcfd019e1aac14a2c5de082e7c5e
                 tmp = RA_AllocARMRegister(&ptr);
                 *ptr++ = sbcs(dest, dest, src);
                 *ptr++ = str_offset(regy, dest, 0);

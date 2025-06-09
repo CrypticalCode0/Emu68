@@ -11,7 +11,6 @@
 #include <stdint.h>
 #include "../include/A64.h"
 #include "../include/M68k.h"
-#include "../include/support.h"
 #include "../include/cache.h"
 #include "math/libm.h"
 
@@ -3541,28 +3540,28 @@ static struct FPUFormatDef JumpTableOp[128] = {
 	[0x30 ... 0x37] = { { EMIT_FSINCOS },  NULL, FPCR_PREC, (FPCC | FPEB) },
 	[0x38]		    = { { EMIT_FCMP },	 NULL, FPCR_PREC, (FPCC | FPEB) },
 	[0x3A]		    = { { EMIT_FTST },	 NULL, FPCR_PREC, (FPCC | FPEB) },
-	[0x40]		    = { { EMIT_FMOVE_S },  NULL, (FPCR_RND, FPSRB_INEX1) },  //rounded to single
-	[0x41]		    = { { EMIT_FSQRT_S },  NULL, 0, (FPCC | FPSRB_INEX1) },  //rounded to single
-	[0x44]		    = { { EMIT_FMOVE_D },  NULL, FPCR_RND, FPSRB_INEX1 },  //rounded to double
-	[0x45]		    = { { EMIT_FSQRT_D },  NULL, 0, (FPCC | FPSRB_INEX1) },  //rounded to double
-	[0x58]		    = { { EMIT_FABS_S },   NULL, 0, (FPCC | FPSRB_INEX1) },  //rounded to single
-	[0x5A]		    = { { EMIT_FNEG_S },   NULL, 0, (FPCC | FPSRB_INEX1) },  //rounded to single
-	[0x5C]		    = { { EMIT_FABS_D },   NULL, 0, (FPCC | FPSRB_INEX1) },  //rounded to double
-	[0x5E]		    = { { EMIT_FNEG_D },   NULL, 0, (FPCC | FPSRB_INEX1) },  //rounded to double
-	[0x60]		    = { { EMIT_FDIV_S },   NULL, 0, (FPCC | FPSRB_INEX1) },  //rounded to single
-	[0x62]		    = { { EMIT_FADD_S },   NULL, 0, (FPCC | FPSRB_INEX1) },  //rounded to single
-	[0x63]		    = { { EMIT_FMUL_S },   NULL, 0, (FPCC | FPSRB_INEX1) },  //rounded to single
-	[0x64]		    = { { EMIT_FDIV_D },   NULL, 0, (FPCC | FPSRB_INEX1) },  //rounded to double
-	[0x66]		    = { { EMIT_FADD_D },   NULL, 0, (FPCC | FPSRB_INEX1) },  //rounded to double
-	[0x67]		    = { { EMIT_FMUL_D },   NULL, 0, (FPCC | FPSRB_INEX1) },  //rounded to double
-	[0x68]		    = { { EMIT_FSUB_S },   NULL, 0, (FPCC | FPSRB_INEX1) },  //rounded to single
-	[0x6C]		    = { { EMIT_FSUB_D },   NULL, 0, (FPCC | FPSRB_INEX1) },  //rounded to double
+	[0x40]		    = { { EMIT_FMOVE_S },  NULL, (FPCR_RND, FPSRB_INEX1) }, //rounded to single
+	[0x41]		    = { { EMIT_FSQRT_S },  NULL, 0, (FPCC | FPSRB_INEX1) }, //rounded to single
+	[0x44]		    = { { EMIT_FMOVE_D },  NULL, FPCR_RND, FPSRB_INEX1 },   //rounded to double
+	[0x45]		    = { { EMIT_FSQRT_D },  NULL, 0, (FPCC | FPSRB_INEX1) }, //rounded to double
+	[0x58]		    = { { EMIT_FABS_S },   NULL, 0, (FPCC | FPSRB_INEX1) }, //rounded to single
+	[0x5A]		    = { { EMIT_FNEG_S },   NULL, 0, (FPCC | FPSRB_INEX1) }, //rounded to single
+	[0x5C]		    = { { EMIT_FABS_D },   NULL, 0, (FPCC | FPSRB_INEX1) }, //rounded to double
+	[0x5E]		    = { { EMIT_FNEG_D },   NULL, 0, (FPCC | FPSRB_INEX1) }, //rounded to double
+	[0x60]		    = { { EMIT_FDIV_S },   NULL, 0, (FPCC | FPSRB_INEX1) }, //rounded to single
+	[0x62]		    = { { EMIT_FADD_S },   NULL, 0, (FPCC | FPSRB_INEX1) }, //rounded to single
+	[0x63]		    = { { EMIT_FMUL_S },   NULL, 0, (FPCC | FPSRB_INEX1) }, //rounded to single
+	[0x64]		    = { { EMIT_FDIV_D },   NULL, 0, (FPCC | FPSRB_INEX1) }, //rounded to double
+	[0x66]		    = { { EMIT_FADD_D },   NULL, 0, (FPCC | FPSRB_INEX1) }, //rounded to double
+	[0x67]		    = { { EMIT_FMUL_D },   NULL, 0, (FPCC | FPSRB_INEX1) }, //rounded to double
+	[0x68]		    = { { EMIT_FSUB_S },   NULL, 0, (FPCC | FPSRB_INEX1) }, //rounded to single
+	[0x6C]		    = { { EMIT_FSUB_D },   NULL, 0, (FPCC | FPSRB_INEX1) }, //rounded to double
 };
 /* Any format function should preload specified registers according to format and jump to FPU Instruction table. */
 uint32_t *EMIT_FORMAT(uint32_t *ptr, uint16_t opcode, uint16_t opcode2, uint16_t **m68k_ptr) {
 
-	if (JumpTableOp[opcode2 & 0x7f].od_Emit)
-		ptr = JumpTableOp[opcode2 & 0x7f].od_Emit(ptr, opcode, opcode2, m68k_ptr);
+	if (JumpTableOp[opcode2 & 0x7f].od_EmitF)
+		ptr = JumpTableOp[opcode2 & 0x7f].od_EmitF(ptr, opcode, opcode2, m68k_ptr);
 	else {
 		ptr = EMIT_FlushPC(ptr);
 		ptr = EMIT_InjectDebugString(ptr, "[JIT] opcode %04x at %08x not implemented\n", opcode, *m68k_ptr - 1);
@@ -3594,11 +3593,11 @@ static struct FPUFMTDef FPU[64] = {
 
 uint32_t *EMIT_FPU(uint32_t *ptr, uint16_t **m68k_ptr, uint16_t *insn_consumed) {
 
-	uint16_t opcode = BE16((*m68k_ptr)[0]);
-	uint16_t opcode2 = BE16((*m68k_ptr)[1]);
+    uint16_t opcode = cache_read_16(ICACHE, (uintptr_t)&(*m68k_ptr)[0]);
+	uint16_t opcode2 = cache_read_16(ICACHE, (uintptr_t)&(*m68k_ptr)[1]);
 
-	if (FPU[opcode2 >> 10 & 077].od_Emit) {
-		ptr = FPU[opcode2 >> 10 & 077].od_Emit(ptr, opcode, opcode2, m68k_ptr);
+	if (FPU[opcode2 >> 10 & 077].od_EmitF) {
+		ptr = FPU[opcode2 >> 10 & 077].od_EmitF(ptr, opcode, opcode2, m68k_ptr);
 	}
 	else {
 		ptr = EMIT_FlushPC(ptr);

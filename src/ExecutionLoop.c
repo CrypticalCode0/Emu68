@@ -1,6 +1,6 @@
-#include <M68k.h>
-#include <support.h>
-#include <config.h>
+#include "../include/M68k.h"
+#include "../include/support.h"
+#include "../include/config.h"
 #ifdef PISTORM
 #ifndef PISTORM32
 #define PS_PROTOCOL_IMPL
@@ -23,12 +23,12 @@ static inline void CallARMCode()
 static inline struct M68KTranslationUnit *FindUnit()
 {
     register uint16_t *PC asm("x18");
-    
+
     /* Perform search */
     uint32_t hash = (uint32_t)(uintptr_t)PC;
     struct List *bucket = &ICache[(hash >> EMU68_HASHSHIFT) & EMU68_HASHMASK];
     struct M68KTranslationUnit *node;
-    
+
     /* Go through the list of translated units */
     ForeachNode(bucket, node)
     {
@@ -46,7 +46,7 @@ static inline struct M68KTranslationUnit *FindUnit()
             struct Node *prev = node->mt_HashNode.ln_Pred;
             struct Node *succ = node->mt_HashNode.ln_Succ;
             struct Node *prevprev = prev->ln_Pred;
-            
+
             /* If node is not head, then move it one level up */
             if (prevprev != NULL)
             {
@@ -60,8 +60,8 @@ static inline struct M68KTranslationUnit *FindUnit()
 
                 succ->ln_Pred = prev;
             }
-#endif                   
-            return node;    
+#endif
+            return node;
         }
     }
 
@@ -131,15 +131,15 @@ void MainLoop()
     register void *ARM asm("x12");
     uint16_t *LastPC;
     struct M68KState *ctx = getCTX();
-    
+
     M68K_LoadContext(ctx);
 
     asm volatile("mov v28.d[0], xzr");
 
     /* The JIT loop is running forever */
     while(1)
-    {   
-        /* Load m68k context and last used PC counter into temporary register */ 
+    {
+        /* Load m68k context and last used PC counter into temporary register */
         LastPC = getLastPC();
         ctx = getCTX();
 
@@ -169,7 +169,7 @@ void MainLoop()
                 if (ctx->INT.IPL > level)
                 {
                     level = ctx->INT.IPL;
-                }    
+                }
 #else
                 /* On classic pistorm we need to obtain IPL from PiStorm status register */
                 if (ctx->INT.IPL)
@@ -190,7 +190,7 @@ void MainLoop()
                     {
                         level = ipl_level;
                     }
-                }           
+                }
 #endif
             }
 
@@ -219,7 +219,7 @@ void MainLoop()
                         asm volatile("mov %w0, v31.S[2]":"=r"(sp));
                     }
                 }
-                
+
                 SRcopy = SR;
                 /* Swap C and V flags in the copy */
                 if ((SRcopy & 3) != 0 && (SRcopy & 3) != 3)
@@ -248,7 +248,7 @@ void MainLoop()
                 vbr = ctx->VBR;
 
                 /* Load PC */
-                asm volatile("ldr %w0, [%1, %2]":"=r"(PC):"r"(vbr),"r"(vector)); 
+                asm volatile("ldr %w0, [%1, %2]":"=r"(PC):"r"(vbr),"r"(vector));
             }
 
             /* All interrupts masked or new PC loaded and stack swapped, continue with code execution */
@@ -259,7 +259,7 @@ void MainLoop()
         asm volatile("mov %w0, v31.s[0]":"=r"(cacr));
 
         if (likely(cacr & CACR_IE))
-        {   
+        {
             /* Force reload of PC*/
             asm volatile("":"=r"(PC));
 
@@ -285,7 +285,7 @@ void MainLoop()
                     /* This is the case, load entry point into x12 */
                     ARM = node->mt_ARMEntryPoint;
                     asm volatile("":"=r"(ARM):"0"(ARM));
-                    
+
                     CallARMCode();
 
                     /* Go back to beginning of the loop */

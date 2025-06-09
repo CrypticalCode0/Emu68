@@ -482,7 +482,10 @@ struct OpcodeDef {
 };
 
 struct FPUOpcodeDef {
-    EMIT_Function   od_Emit;
+    union {
+        EMIT_Function   od_Emit;
+        EMIT_FLine      od_EmitF;
+    };
     void *          od_Interpret;   // Not used yet.
     uint32_t        od_FPSRNeeds;
     uint32_t        od_FPSRSets;
@@ -492,7 +495,10 @@ struct FPUOpcodeDef {
 };
 
 struct FPUFMTDef {
-    EMIT_FLine      od_Emit;
+    union {
+        EMIT_Function   od_Emit;
+        EMIT_FLine      od_EmitF;
+    };
     void *          od_Interpret;   // Not used yet.
     uint32_t        od_FPSRNeeds;
     uint32_t        od_FPSRSets;
@@ -502,7 +508,7 @@ struct FPUFMTDef {
 };
 
 struct FPUFormatDef {
-    EMIT_FLine      od_Emit;
+    EMIT_FLine      od_EmitF;
     void *          od_Interpret;   // Not used yet.
     uint32_t        od_FPSRNeeds;
     uint32_t        od_FPSRSets;

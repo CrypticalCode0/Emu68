@@ -1,4 +1,4 @@
-#include "EmuLogo.h"
+#include "../include/EmuLogo.h"
 
 #define LOGO_480
 
