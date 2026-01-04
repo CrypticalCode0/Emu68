@@ -329,23 +329,6 @@ struct M68KState
 #define M_CC_GT 0x0e
 #define M_CC_LE 0x0f
 
-#define P_CC_BS 000
-#define P_CC_BC 001
-#define P_CC_LS 002
-#define P_CC_LC 003
-#define P_CC_SS 004
-#define P_CC_SC 005
-#define P_CC_AS 006
-#define P_CC_AC 007
-#define P_CC_WS 010
-#define P_CC_WC 011
-#define P_CC_IS 012
-#define P_CC_IC 013
-#define P_CC_GS 014
-#define P_CC_GC 015
-#define P_CC_CS 016
-#define P_CC_CC 017
-
 #define F_CC_EQ     0x01
 #define F_CC_NE     0x0e
 #define F_CC_GT     0x12
